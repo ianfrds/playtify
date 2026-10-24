@@ -18,7 +18,8 @@ export default function HomePage() {
     brandName,
     toggleLike,
     isLiked,
-    setIsBrandModalOpen,
+    user,
+    openAuthModal,
   } = useAudio();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -75,22 +76,47 @@ export default function HomePage() {
         <div className="mobile-user-profile">
           <div
             className="mobile-avatar-wrap"
-            onClick={() => setIsBrandModalOpen(true)}
+            onClick={() => {
+              if (user) {
+                router.push('/login');
+              } else {
+                openAuthModal('Masuk ke Playtify', 'Nikmati playlist tanpa batas dan sinkronkan lagu favoritmu.');
+              }
+            }}
             role="button"
             tabIndex={0}
-            title="Edit Nama Brand"
-            aria-label="Edit Nama Brand"
+            title={user ? 'Lihat Akun' : 'Masuk / Daftar'}
+            aria-label={user ? 'Lihat Akun' : 'Masuk / Daftar'}
           >
-            <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-              alt="Avatar"
-              className="mobile-avatar"
-            />
+            {user?.user_metadata?.avatar_url || user?.user_metadata?.picture ? (
+              <img
+                src={user.user_metadata.avatar_url || user.user_metadata.picture}
+                alt="Avatar"
+                className="mobile-avatar"
+              />
+            ) : (
+              <div
+                className="mobile-avatar"
+                style={{
+                  background: user ? '#1ed760' : 'rgba(255,255,255,0.1)',
+                  color: user ? '#000' : '#fff',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.88rem',
+                }}
+              >
+                {user ? (user.user_metadata?.full_name || user.email || 'U').charAt(0).toUpperCase() : '🎧'}
+              </div>
+            )}
             <span className="mobile-online-dot" />
           </div>
           <div className="mobile-user-text">
             <span className="mobile-greeting-label">{getGreeting()}!</span>
-            <p className="mobile-user-name">{brandName} Music</p>
+            <p className="mobile-user-name">
+              {user ? (user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0]) : 'Tamu Playtify'}
+            </p>
           </div>
         </div>
         <div className="mobile-top-actions">

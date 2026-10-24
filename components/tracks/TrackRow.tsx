@@ -11,9 +11,10 @@ interface TrackRowProps {
   playCount?: string;
   onPlay?: () => void;
   queueContext?: Track[];
+  onRemove?: () => void;
 }
 
-export function TrackRow({ track, index, playCount, onPlay, queueContext }: TrackRowProps) {
+export function TrackRow({ track, index, playCount, onPlay, queueContext, onRemove }: TrackRowProps) {
   const { currentTrack, isPlaying, playTrack, toggleLike, isLiked } = useAudio();
   const router = useRouter();
 
@@ -140,6 +141,31 @@ export function TrackRow({ track, index, playCount, onPlay, queueContext }: Trac
             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
           </svg>
         </button>
+        {onRemove && (
+          <button
+            className="icon-btn btn-remove-track"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            title="Hapus dari playlist"
+            aria-label="Hapus dari playlist"
+            style={{ opacity: 0.6, transition: 'opacity 0.2s, color 0.2s', padding: 4 }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.opacity = '1';
+              e.currentTarget.style.color = '#ff4d4d';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.opacity = '0.6';
+              e.currentTarget.style.color = '';
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          </button>
+        )}
         <span className="track-duration">{formatTime(track.duration)}</span>
       </div>
     </div>

@@ -31,11 +31,44 @@ export default function SpotifyLyrics({
   onExpand,
   onClose,
 }: SpotifyLyricsProps) {
-  const lyrics = getLyricsForTrack(track.id, track.title, track.artist);
+  const [lyrics, setLyrics] = useState(() =>
+    getLyricsForTrack(track.id, track.title, track.artist)
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   const lineRefs = useRef<(HTMLParagraphElement | null)[]>([]);
   const isUserScrollingRef = useRef(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fetch real-time millisecond accurate synced lyrics whenever track changes
+  useEffect(() => {
+    setLyrics(getLyricsForTrack(track.id, track.title, track.artist));
+
+    let cancelled = false;
+    const fetchAccurateLyrics = async () => {
+      try {
+        const query = new URLSearchParams({
+          title: track.title,
+          artist: track.artist,
+          id: track.id,
+          duration: (duration || track.duration || 210).toString(),
+        });
+        const res = await fetch(`/api/lyrics?${query.toString()}`);
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          if (data && data.lines && data.lines.length > 0) {
+            setLyrics(data);
+          }
+        }
+      } catch {
+        // keep baseline
+      }
+    };
+
+    fetchAccurateLyrics();
+    return () => {
+      cancelled = true;
+    };
+  }, [track.id, track.title, track.artist, duration]);
 
   // Compute active lyric line index based on current playback time
   const activeIndex = lyrics.lines.reduce((acc, line, idx) => {

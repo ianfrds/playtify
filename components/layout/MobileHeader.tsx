@@ -5,24 +5,43 @@ import { useAudio } from '@/context/AudioContext';
 import { useRouter } from 'next/navigation';
 
 export function MobileHeader() {
-  const { setIsBrandModalOpen, toggleRecDrawer } = useAudio();
+  const { user, openAuthModal, toggleRecDrawer } = useAudio();
   const router = useRouter();
+
+  const userAvatar = user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
+  const initial = (user?.user_metadata?.full_name || user?.email || 'U').charAt(0).toUpperCase();
+
+  const handleAvatarClick = () => {
+    if (user) {
+      router.push('/login');
+    } else {
+      openAuthModal('Masuk ke Playtify', 'Nikmati fitur lengkap dan sinkronkan lagu favoritmu.');
+    }
+  };
 
   return (
     <div className="mobile-top-header">
       <button
         className="mobile-avatar-wrap"
-        onClick={() => setIsBrandModalOpen(true)}
-        title="Ubah Nama Brand"
-        aria-label="Ubah Nama Brand"
+        onClick={handleAvatarClick}
+        title={user ? 'Lihat Akun' : 'Masuk / Daftar'}
+        aria-label={user ? 'Lihat Akun' : 'Masuk / Daftar'}
       >
-        <div className="mobile-avatar">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M8 11.5c3.5-1 7-0.5 9.5 1" stroke="#0a0a0a" strokeWidth="2" strokeLinecap="round" fill="none" />
-            <path d="M7.5 14.5c4-1 8-0.5 10.5 1" stroke="#0a0a0a" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-            <path d="M9 8.5c3-0.8 6-0.3 8.5 1" stroke="#0a0a0a" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-          </svg>
+        <div className="mobile-avatar" style={{ overflow: 'hidden' }}>
+          {user ? (
+            userAvatar ? (
+              <img src={userAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <span style={{ color: '#000', fontWeight: 800, fontSize: '0.9rem' }}>{initial}</span>
+            )
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M8 11.5c3.5-1 7-0.5 9.5 1" stroke="#0a0a0a" strokeWidth="2" strokeLinecap="round" fill="none" />
+              <path d="M7.5 14.5c4-1 8-0.5 10.5 1" stroke="#0a0a0a" strokeWidth="1.8" strokeLinecap="round" fill="none" />
+              <path d="M9 8.5c3-0.8 6-0.3 8.5 1" stroke="#0a0a0a" strokeWidth="2.2" strokeLinecap="round" fill="none" />
+            </svg>
+          )}
         </div>
       </button>
 

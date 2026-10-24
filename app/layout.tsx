@@ -2,20 +2,10 @@ import type { Metadata, Viewport } from 'next';
 import React from 'react';
 import './globals.css';
 import { AudioProvider } from '@/context/AudioContext';
-import GlobalAudioPlayer from '@/components/player/GlobalAudioPlayer';
-import Sidebar from '@/components/layout/Sidebar';
-import PlayerBar from '@/components/player/PlayerBar';
-import MobileMiniPlayer from '@/components/player/MobileMiniPlayer';
-import BottomDock from '@/components/layout/BottomDock';
-import ModalNowPlaying from '@/components/player/ModalNowPlaying';
-import QueueSidebar from '@/components/drawers/QueueSidebar';
-import RecDrawer from '@/components/drawers/RecDrawer';
-import BrandModal from '@/components/modals/BrandModal';
-import NewPlaylistModal from '@/components/modals/NewPlaylistModal';
-import FullscreenLyricsModal from '@/components/modals/FullscreenLyricsModal';
-import Toast from '@/components/common/Toast';
+import AppShell from '@/components/layout/AppShell';
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://playtifyy.vercel.app'),
   title: 'Playtify - Pemutar Musik Online Modern',
   description: 'Streaming musik bebas hambatan dengan rekomendasi YouTube terupdate, profil artis lengkap, dan audio stabil.',
   manifest: '/manifest.json',
@@ -50,38 +40,7 @@ export default function RootLayout({
       </head>
       <body>
         <AudioProvider>
-          {/* Persistent Audio Engine */}
-          <GlobalAudioPlayer />
-
-          <div id="app">
-            {/* Desktop Left Sidebar */}
-            <Sidebar />
-
-            {/* Main Scrollable Stage */}
-            <main id="main-content" className="main-content">
-              {children}
-            </main>
-
-            {/* Desktop Player Bar */}
-            <PlayerBar />
-
-            {/* Mobile Mini Player Pill (Floating 16px above dock) */}
-            <MobileMiniPlayer />
-
-            {/* Mobile Bottom Dock */}
-            <BottomDock />
-
-            {/* Mobile Screen 3 Fullscreen Now Playing Modal */}
-            <ModalNowPlaying />
-
-            {/* Flyout Drawers & Modals */}
-            <QueueSidebar />
-            <RecDrawer />
-            <BrandModal />
-            <NewPlaylistModal />
-            <FullscreenLyricsModal />
-            <Toast />
-          </div>
+          <AppShell>{children}</AppShell>
         </AudioProvider>
       </body>
     </html>

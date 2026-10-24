@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAudio } from '@/context/AudioContext';
 import { getArtistData } from '@/data/artists';
@@ -11,9 +11,41 @@ export default function ArtistProfilePage() {
   const router = useRouter();
   const { playTrack, followedArtists, toggleFollowArtist, currentTrack } = useAudio();
   const [activeTab, setActiveTab] = useState<'all' | 'album' | 'single'>('all');
+  const [dynamicArtist, setDynamicArtist] = useState<any>(null);
 
   const artistId = (params?.id as string) || 'bernadya';
-  const artist = getArtistData(artistId, currentTrack);
+  const baseArtist = getArtistData(artistId, currentTrack);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchYtArtist = async () => {
+      try {
+        const res = await fetch(`/api/artist?q=${encodeURIComponent(artistId)}`);
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          if (data && data.name) {
+            setDynamicArtist(data);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+    fetchYtArtist();
+    return () => {
+      cancelled = true;
+    };
+  }, [artistId]);
+
+  const artist = {
+    ...baseArtist,
+    name: dynamicArtist?.name || baseArtist.name,
+    avatar: dynamicArtist?.avatar || baseArtist.avatar,
+    banner: dynamicArtist?.avatar || baseArtist.banner,
+    bio: dynamicArtist?.description || baseArtist.bio,
+    popularTracks: dynamicArtist?.popularTracks?.length ? dynamicArtist.popularTracks : baseArtist.popularTracks,
+    albums: dynamicArtist?.albums?.length ? dynamicArtist.albums : baseArtist.albums,
+  };
 
   const isFollowed = followedArtists.some(
     (a) => a.toLowerCase() === artist.name.toLowerCase() || a.toLowerCase() === artist.id?.toLowerCase()
@@ -26,7 +58,7 @@ export default function ArtistProfilePage() {
     }
   };
 
-  const filteredAlbums = artist.albums.filter((a) => {
+  const filteredAlbums = (artist.albums || []).filter((a) => {
     if (activeTab === 'album') return a.type.toLowerCase() === 'album';
     if (activeTab === 'single') return a.type.toLowerCase() === 'single' || a.type.toLowerCase() === 'ep';
     return true;

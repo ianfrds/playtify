@@ -3,8 +3,32 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Track, UserPlaylist } from '@/types';
 import { ALL_RECOMMENDATIONS_POOL, RECOMMENDATIONS_DATA } from '@/data/recommendations';
+import {
+  fetchRemotePlaylists,
+  upsertRemotePlaylist,
+  deleteRemotePlaylist,
+  addTrackToRemotePlaylist,
+  removeTrackFromRemotePlaylist,
+  fetchRemoteLikedTracks,
+  addRemoteLikedTrack,
+  removeRemoteLikedTrack,
+  supabase,
+  signOutUser,
+} from '@/lib/supabase';
 
 interface AudioContextType {
+  user: any | null;
+  session: any | null;
+  signOut: () => Promise<void>;
+  isGuest: boolean;
+  isAuthLoading: boolean;
+  enterGuestMode: () => void;
+  isAuthModalOpen: boolean;
+  authModalTitle: string;
+  authModalSubtitle: string;
+  openAuthModal: (title?: string, subtitle?: string) => void;
+  closeAuthModal: () => void;
+
   brandName: string;
   setBrandName: (name: string) => void;
   currentTrack: Track | null;
@@ -27,6 +51,7 @@ interface AudioContextType {
   isLyricsModalOpen: boolean;
   isBrandModalOpen: boolean;
   isNewPlaylistModalOpen: boolean;
+  openNewPlaylistModal: () => void;
   toastMessage: string | null;
 
   toggleLyricsModal: (force?: boolean) => void;
@@ -49,6 +74,8 @@ interface AudioContextType {
   createPlaylist: (name: string) => void;
   addTrackToPlaylist: (playlistId: string, track: Track) => void;
   deletePlaylist: (playlistId: string) => void;
+  updatePlaylist: (playlistId: string, updates: { name?: string; description?: string; cover?: string }) => void;
+  removeTrackFromPlaylist: (playlistId: string, trackId: string) => void;
   refreshRecommendations: () => Promise<void>;
 
   openNowPlayingModal: () => void;
@@ -58,6 +85,18 @@ interface AudioContextType {
   toggleRecDrawer: (force?: boolean) => void;
   setIsBrandModalOpen: (open: boolean) => void;
   setIsNewPlaylistModalOpen: (open: boolean) => void;
+
+  isEditPlaylistModalOpen: boolean;
+  setIsEditPlaylistModalOpen: (open: boolean) => void;
+  editingPlaylist: UserPlaylist | null;
+  openEditPlaylistModal: (playlist: UserPlaylist) => void;
+  closeEditPlaylistModal: () => void;
+
+  isDeletePlaylistModalOpen: boolean;
+  setIsDeletePlaylistModalOpen: (open: boolean) => void;
+  deletingPlaylist: UserPlaylist | null;
+  openDeletePlaylistModal: (playlist: UserPlaylist) => void;
+  closeDeletePlaylistModal: () => void;
   showToast: (msg: string) => void;
 
   // Internal player synchronization
@@ -70,6 +109,16 @@ interface AudioContextType {
 const AudioContext = createContext<AudioContextType | null>(null);
 
 export function AudioProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<any | null>(null);
+  const [session, setSession] = useState<any | null>(null);
+  const [isGuest, setIsGuest] = useState<boolean>(false);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [authModalTitle, setAuthModalTitle] = useState<string>('Masuk ke Playtify');
+  const [authModalSubtitle, setAuthModalSubtitle] = useState<string>(
+    'Nikmati musik tanpa batas dan sinkronkan playlist di cloud.'
+  );
+
   const [brandName, setBrandNameState] = useState<string>('Playtify');
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -92,6 +141,10 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [isLyricsModalOpen, setIsLyricsModalOpen] = useState<boolean>(false);
   const [isBrandModalOpen, setIsBrandModalOpen] = useState<boolean>(false);
   const [isNewPlaylistModalOpen, setIsNewPlaylistModalOpen] = useState<boolean>(false);
+  const [isEditPlaylistModalOpen, setIsEditPlaylistModalOpen] = useState<boolean>(false);
+  const [editingPlaylist, setEditingPlaylist] = useState<UserPlaylist | null>(null);
+  const [isDeletePlaylistModalOpen, setIsDeletePlaylistModalOpen] = useState<boolean>(false);
+  const [deletingPlaylist, setDeletingPlaylist] = useState<UserPlaylist | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -137,6 +190,9 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   // Load initial persistent state from localStorage
   useEffect(() => {
     try {
+      const savedGuest = localStorage.getItem('playtify_guest');
+      if (savedGuest === 'true') setIsGuest(true);
+
       const savedBrand = localStorage.getItem('playtify_brand');
       if (savedBrand) setBrandNameState(savedBrand);
 
@@ -160,13 +216,91 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       // Ignore
     }
 
+    // Asynchronously sync with Supabase Cloud
+    fetchRemotePlaylists().then((remotePl) => {
+      if (remotePl && remotePl.length > 0) {
+        setPlaylists(remotePl);
+        try {
+          localStorage.setItem('playtify_playlists', JSON.stringify(remotePl));
+        } catch {
+          // ignore
+        }
+      }
+    });
+
+    fetchRemoteLikedTracks().then((remoteLikes) => {
+      if (remoteLikes && remoteLikes.length > 0) {
+        setLikedTracks(remoteLikes);
+        try {
+          localStorage.setItem('playtify_liked', JSON.stringify(remoteLikes));
+        } catch {
+          // ignore
+        }
+      }
+    });
+
+    // Listen to Supabase Auth State Changes
+    let authSubscription: any = null;
+    if (supabase) {
+      supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        setIsAuthLoading(false);
+      }).catch(() => {
+        setIsAuthLoading(false);
+      });
+
+      const { data } = supabase.auth.onAuthStateChange((_event, newSession) => {
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+        setIsAuthLoading(false);
+      });
+      authSubscription = data?.subscription;
+    } else {
+      setIsAuthLoading(false);
+    }
+
     // Auto-update recommendations every 30 minutes in background
     const timer = setInterval(() => {
       refreshRecommendations();
     }, 30 * 60 * 1000);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      if (authSubscription) authSubscription.unsubscribe();
+    };
   }, []);
+
+  const openAuthModal = (title?: string, subtitle?: string) => {
+    if (title) setAuthModalTitle(title);
+    else setAuthModalTitle('Masuk ke Playtify');
+    if (subtitle) setAuthModalSubtitle(subtitle);
+    else setAuthModalSubtitle('Nikmati musik tanpa batas dan sinkronkan playlist di cloud.');
+    setIsAuthModalOpen(true);
+  };
+
+  const closeAuthModal = () => {
+    setIsAuthModalOpen(false);
+  };
+
+  const enterGuestMode = () => {
+    setIsGuest(true);
+    try {
+      localStorage.setItem('playtify_guest', 'true');
+    } catch {}
+    showToast('Selamat menikmati musik di Playtify!');
+  };
+
+  const signOut = async () => {
+    await signOutUser();
+    setUser(null);
+    setSession(null);
+    setIsGuest(false);
+    try {
+      localStorage.removeItem('playtify_guest');
+    } catch {}
+    showToast('Berhasil keluar dari akun');
+  };
 
   const setBrandName = (name: string) => {
     setBrandNameState(name);
@@ -298,17 +432,30 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleLike = (track: Track) => {
+    if (!user) {
+      openAuthModal(
+        'Masuk untuk Menyimpan Favorit',
+        'Simpan lagu favoritmu dan sinkronkan di semua perangkat dengan masuk ke akun Playtify.'
+      );
+      return;
+    }
     setLikedTracks((prev) => {
       const exists = prev.some((t) => t.id === track.id);
       let updated: Track[];
       if (exists) {
         updated = prev.filter((t) => t.id !== track.id);
         showToast('Dihapus dari Lagu Disukai');
+        removeRemoteLikedTrack(track.id);
       } else {
         updated = [track, ...prev];
         showToast('Ditambahkan ke Lagu Disukai');
+        addRemoteLikedTrack(track);
       }
-      localStorage.setItem('playtify_liked', JSON.stringify(updated));
+      try {
+        localStorage.setItem('playtify_liked', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
       return updated;
     });
   };
@@ -318,6 +465,13 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   };
 
   const toggleFollowArtist = (name: string) => {
+    if (!user) {
+      openAuthModal(
+        'Masuk untuk Mengikuti Artis',
+        'Ikuti artis favoritmu untuk rilis musik terbaru dengan akun Playtify.'
+      );
+      return;
+    }
     setFollowedArtists((prev) => {
       const exists = prev.some((a) => a.toLowerCase() === name.toLowerCase());
       let updated: string[];
@@ -328,7 +482,11 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         updated = [...prev, name];
         showToast(`Mulai mengikuti ${name}`);
       }
-      localStorage.setItem('playtify_followed_artists', JSON.stringify(updated));
+      try {
+        localStorage.setItem('playtify_followed_artists', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
       return updated;
     });
   };
@@ -337,7 +495,25 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     return followedArtists.some((a) => a.toLowerCase() === name.toLowerCase());
   };
 
+  const openNewPlaylistModal = () => {
+    if (!user) {
+      openAuthModal(
+        'Masuk untuk Membuat Playlist',
+        'Kumpulkan musik kesukaanmu dalam playlist pribadi dengan membuat atau masuk ke akun Playtify.'
+      );
+      return;
+    }
+    setIsNewPlaylistModalOpen(true);
+  };
+
   const createPlaylist = (name: string) => {
+    if (!user) {
+      openAuthModal(
+        'Masuk untuk Membuat Playlist',
+        'Kumpulkan musik kesukaanmu dalam playlist pribadi dengan membuat atau masuk ke akun Playtify.'
+      );
+      return;
+    }
     if (!name.trim()) return;
     const newPl: UserPlaylist = {
       id: 'pl-' + Date.now(),
@@ -347,9 +523,14 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     };
     setPlaylists((prev) => {
       const updated = [newPl, ...prev];
-      localStorage.setItem('playtify_playlists', JSON.stringify(updated));
+      try {
+        localStorage.setItem('playtify_playlists', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
       return updated;
     });
+    upsertRemotePlaylist(newPl);
     showToast(`Playlist "${name}" dibuat`);
     setIsNewPlaylistModalOpen(false);
   };
@@ -363,22 +544,123 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
             return pl;
           }
           showToast(`Lagu ditambahkan ke ${pl.name}`);
-          return { ...pl, tracks: [...pl.tracks, track] };
+          const newTracks = [...pl.tracks, track];
+          addTrackToRemotePlaylist(playlistId, track, newTracks.length - 1);
+          return { ...pl, tracks: newTracks };
         }
         return pl;
       });
-      localStorage.setItem('playtify_playlists', JSON.stringify(updated));
+      try {
+        localStorage.setItem('playtify_playlists', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
       return updated;
     });
+  };
+
+  const openEditPlaylistModal = (playlist: UserPlaylist) => {
+    if (!user) {
+      openAuthModal(
+        'Masuk untuk Mengubah Playlist',
+        'Masuk ke akun Playtify untuk mengedit playlist.'
+      );
+      return;
+    }
+    setEditingPlaylist(playlist);
+    setIsEditPlaylistModalOpen(true);
+  };
+
+  const closeEditPlaylistModal = () => {
+    setIsEditPlaylistModalOpen(false);
+    setEditingPlaylist(null);
+  };
+
+  const openDeletePlaylistModal = (playlist: UserPlaylist) => {
+    if (!user) {
+      openAuthModal(
+        'Masuk untuk Menghapus Playlist',
+        'Masuk ke akun Playtify untuk mengelola playlist.'
+      );
+      return;
+    }
+    setDeletingPlaylist(playlist);
+    setIsDeletePlaylistModalOpen(true);
+  };
+
+  const closeDeletePlaylistModal = () => {
+    setIsDeletePlaylistModalOpen(false);
+    setDeletingPlaylist(null);
   };
 
   const deletePlaylist = (playlistId: string) => {
     setPlaylists((prev) => {
       const updated = prev.filter((pl) => pl.id !== playlistId);
-      localStorage.setItem('playtify_playlists', JSON.stringify(updated));
+      try {
+        localStorage.setItem('playtify_playlists', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
       return updated;
     });
-    showToast('Playlist dihapus');
+    deleteRemotePlaylist(playlistId);
+    showToast('Playlist berhasil dihapus');
+    closeDeletePlaylistModal();
+  };
+
+  const updatePlaylist = (
+    playlistId: string,
+    updates: { name?: string; description?: string; cover?: string }
+  ) => {
+    setPlaylists((prev) => {
+      let updatedTarget: UserPlaylist | null = null;
+      const updated = prev.map((pl) => {
+        if (pl.id === playlistId) {
+          updatedTarget = {
+            ...pl,
+            name: updates.name !== undefined && updates.name.trim() ? updates.name.trim() : pl.name,
+            description: updates.description !== undefined ? updates.description : (pl.description || pl.desc || ''),
+            desc: updates.description !== undefined ? updates.description : (pl.description || pl.desc || ''),
+            cover: updates.cover !== undefined ? updates.cover : pl.cover,
+          };
+          return updatedTarget;
+        }
+        return pl;
+      });
+      try {
+        localStorage.setItem('playtify_playlists', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      if (updatedTarget) {
+        upsertRemotePlaylist(updatedTarget);
+      }
+      return updated;
+    });
+    showToast('Playlist berhasil diperbarui');
+    closeEditPlaylistModal();
+  };
+
+  const removeTrackFromPlaylist = (playlistId: string, trackId: string) => {
+    setPlaylists((prev) => {
+      const updated = prev.map((pl) => {
+        if (pl.id === playlistId) {
+          return {
+            ...pl,
+            tracks: pl.tracks.filter((t) => t.id !== trackId),
+          };
+        }
+        return pl;
+      });
+      try {
+        localStorage.setItem('playtify_playlists', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+    removeTrackFromRemotePlaylist(playlistId, trackId);
+    showToast('Lagu dihapus dari playlist');
   };
 
   const openNowPlayingModal = () => setIsNowPlayingModalOpen(true);
@@ -422,6 +704,18 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   return (
     <AudioContext.Provider
       value={{
+        user,
+        session,
+        signOut,
+        isGuest,
+        isAuthLoading,
+        enterGuestMode,
+        isAuthModalOpen,
+        authModalTitle,
+        authModalSubtitle,
+        openAuthModal,
+        closeAuthModal,
+
         brandName,
         setBrandName,
         currentTrack,
@@ -443,6 +737,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         isLyricsModalOpen,
         isBrandModalOpen,
         isNewPlaylistModalOpen,
+        openNewPlaylistModal,
         toastMessage,
 
         playTrack,
@@ -462,6 +757,8 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         createPlaylist,
         addTrackToPlaylist,
         deletePlaylist,
+        updatePlaylist,
+        removeTrackFromPlaylist,
         refreshRecommendations,
 
         openNowPlayingModal,
@@ -473,6 +770,19 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         setIsLyricsModalOpen,
         setIsBrandModalOpen,
         setIsNewPlaylistModalOpen,
+
+        isEditPlaylistModalOpen,
+        setIsEditPlaylistModalOpen,
+        editingPlaylist,
+        openEditPlaylistModal,
+        closeEditPlaylistModal,
+
+        isDeletePlaylistModalOpen,
+        setIsDeletePlaylistModalOpen,
+        deletingPlaylist,
+        openDeletePlaylistModal,
+        closeDeletePlaylistModal,
+
         showToast,
 
         setPlayer,
