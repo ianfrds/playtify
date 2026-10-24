@@ -1,31 +1,37 @@
 'use client';
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAudio } from '@/context/AudioContext';
+
+const DEFAULT_COVER = '/logo.png';
 
 export default function MobileMiniPlayer() {
   const router = useRouter();
+  const pathname = usePathname();
   const {
     currentTrack,
     isPlaying,
+    currentTime,
+    duration,
     togglePlay,
     playNext,
     isLiked,
     toggleLike,
-    setNowPlayingModalOpen,
   } = useAudio();
 
-  if (!currentTrack) return null;
+  // Hide mini player if not playing or if already on dedicated Now Playing page
+  if (!currentTrack || pathname === '/now-playing') return null;
 
   const liked = isLiked(currentTrack.id);
-  const thumbUrl = currentTrack.thumbnail || currentTrack.thumb || '';
+  const thumbUrl = currentTrack.thumbnail || currentTrack.thumb || DEFAULT_COVER;
+  const progressPct = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
 
   return (
     <div
       id="mobile-mini-player"
       className="mobile-mini-player visible"
-      onClick={() => setNowPlayingModalOpen(true)}
+      onClick={() => router.push('/now-playing')}
       role="button"
       tabIndex={0}
       aria-label="Buka Pemutar Musik Layar Penuh"
@@ -35,6 +41,9 @@ export default function MobileMiniPlayer() {
           src={thumbUrl}
           alt={currentTrack.title}
           loading="lazy"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = DEFAULT_COVER;
+          }}
         />
       </div>
 
@@ -99,6 +108,14 @@ export default function MobileMiniPlayer() {
             <path d="M16 6h2v12h-2zm-10 0l8.5 6L6 18z" />
           </svg>
         </button>
+      </div>
+
+      {/* Spotify Bottom Scrubber Line */}
+      <div className="mini-player-progress-bar">
+        <div
+          className="mini-player-progress-fill"
+          style={{ width: `${progressPct}%` }}
+        />
       </div>
     </div>
   );

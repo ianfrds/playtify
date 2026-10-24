@@ -37,7 +37,14 @@ export function PlaylistCard({ playlist }: PlaylistCardProps) {
       aria-label={`Buka playlist ${displayName}`}
     >
       <div className="playlist-card-thumb">
-        <img src={thumbUrl} alt={displayName} loading="lazy" />
+        <img
+          src={thumbUrl}
+          alt={displayName}
+          loading="lazy"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = '/logo.png';
+          }}
+        />
         <span className="playlist-card-badge">{playlist.badge}</span>
         <button
           className="playlist-card-play"

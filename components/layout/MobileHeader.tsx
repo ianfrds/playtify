@@ -15,7 +15,7 @@ export function MobileHeader() {
     if (user) {
       router.push('/login');
     } else {
-      openAuthModal('Masuk ke Playtify', 'Nikmati fitur lengkap dan sinkronkan lagu favoritmu.');
+      openAuthModal('Masuk ke Haytify', 'Nikmati fitur lengkap dan sinkronkan lagu favoritmu.');
     }
   };
 

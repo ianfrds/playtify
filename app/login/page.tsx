@@ -80,7 +80,7 @@ export default function LoginPage() {
       user.user_metadata?.full_name ||
       user.user_metadata?.name ||
       user.email?.split('@')[0] ||
-      'Pengguna Playtify';
+      'Pengguna Haytify';
 
     const avatarUrl =
       user.user_metadata?.avatar_url ||
@@ -90,14 +90,13 @@ export default function LoginPage() {
     return (
       <div className="auth-page-container">
         <div className="auth-card" style={{ textAlign: 'center' }}>
-          <div className="auth-brand-logo">
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="#1ed760">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M8 11.5c3.5-1 7-0.5 9.5 1" stroke="#121212" strokeWidth="2" strokeLinecap="round" fill="none" />
-              <path d="M7.5 14.5c4-1 8-0.5 10.5 1" stroke="#121212" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-              <path d="M9 8.5c3-0.8 6-0.3 8.5 1" stroke="#121212" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-            </svg>
-            <h2>Playtify</h2>
+          <div className="auth-brand-logo" style={{ justifyContent: 'center' }}>
+            <img
+              src="/logo.png"
+              alt="Haytify"
+              style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'contain' }}
+            />
+            <h2>Haytify</h2>
           </div>
 
           <div style={{ margin: '24px 0' }}>
@@ -170,17 +169,16 @@ export default function LoginPage() {
         {/* Brand Header */}
         <div className="auth-brand-header">
           <div className="auth-brand-logo" onClick={() => router.push('/')} style={{ cursor: 'pointer' }}>
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="#1ed760">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M8 11.5c3.5-1 7-0.5 9.5 1" stroke="#121212" strokeWidth="2" strokeLinecap="round" fill="none" />
-              <path d="M7.5 14.5c4-1 8-0.5 10.5 1" stroke="#121212" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-              <path d="M9 8.5c3-0.8 6-0.3 8.5 1" stroke="#121212" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-            </svg>
-            <span className="auth-brand-name">Playtify</span>
+            <img
+              src="/logo.png"
+              alt="Haytify"
+              style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'contain' }}
+            />
+            <span className="auth-brand-name">Haytify</span>
           </div>
 
           <h1 className="auth-title">
-            {mode === 'login' ? 'Masuk ke Playtify' : 'Daftar Akun Baru'}
+            {mode === 'login' ? 'Masuk ke Haytify' : 'Daftar Akun Baru'}
           </h1>
           <p className="auth-subtitle">
             {mode === 'login'
@@ -309,7 +307,7 @@ export default function LoginPage() {
             {loading ? (
               <span className="auth-spinner" />
             ) : mode === 'login' ? (
-              'Masuk ke Playtify'
+              'Masuk ke Haytify'
             ) : (
               'Daftar Sekarang'
             )}
@@ -330,7 +328,7 @@ export default function LoginPage() {
                   setSuccessMsg(null);
                 }}
               >
-                Daftar ke Playtify
+                Daftar ke Haytify
               </button>
             </p>
           ) : (
@@ -384,7 +382,7 @@ export default function LoginPage() {
             className="auth-link-back"
             onClick={() => router.push('/')}
           >
-            ← Kembali ke Beranda Playtify
+            ← Kembali ke Beranda Haytify
           </button>
         </div>
       </div>

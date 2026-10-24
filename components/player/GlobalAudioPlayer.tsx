@@ -10,11 +10,71 @@ declare global {
   }
 }
 
+// 1-second silent WAV loop to keep audio context & session active on mobile OS
+const SILENT_WAV_LOOP =
+  'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+
 export function GlobalAudioPlayer() {
-  const { onPlayerReady, onPlayerStateChange, onProgressUpdate } = useAudio();
+  const { isPlaying, onPlayerReady, onPlayerStateChange, onProgressUpdate } = useAudio();
   const playerRef = useRef<any>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const silentAudioRef = useRef<HTMLAudioElement | null>(null);
 
+  // 1. Register Service Worker for PWA & Background Support
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .catch((err) => console.warn('SW registration:', err));
+    }
+  }, []);
+
+  // 2. Mobile Silent Audio Keeper: keep background audio session alive
+  useEffect(() => {
+    if (!silentAudioRef.current) return;
+
+    if (isPlaying) {
+      silentAudioRef.current.play().catch(() => {
+        // May fail if user hasn't interacted yet
+      });
+    } else {
+      silentAudioRef.current.pause();
+    }
+  }, [isPlaying]);
+
+  // 3. Handle mobile background / visibility change
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        if (isPlaying) {
+          silentAudioRef.current?.play().catch(() => {});
+          // If mobile browser forced YouTube pause on tab hide, resume
+          setTimeout(() => {
+            if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
+              const state = playerRef.current.getPlayerState?.();
+              if (state === 2) {
+                playerRef.current.playVideo();
+              }
+            }
+          }, 150);
+        }
+      } else if (document.visibilityState === 'visible') {
+        if (isPlaying && playerRef.current && typeof playerRef.current.playVideo === 'function') {
+          const state = playerRef.current.getPlayerState?.();
+          if (state === 2) {
+            playerRef.current.playVideo();
+          }
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isPlaying]);
+
+  // 4. Initialize YouTube Iframe Player
   useEffect(() => {
     // Check if script already loaded
     if (!window.YT) {
@@ -26,8 +86,8 @@ export function GlobalAudioPlayer() {
     const initPlayer = () => {
       if (window.YT && window.YT.Player) {
         playerRef.current = new window.YT.Player('yt-player-engine', {
-          height: '1',
-          width: '1',
+          height: '2',
+          width: '2',
           playerVars: {
             autoplay: 0,
             controls: 0,
@@ -36,6 +96,7 @@ export function GlobalAudioPlayer() {
             iv_load_policy: 3,
             modestbranding: 1,
             playsinline: 1,
+            enablejsapi: 1,
             rel: 0,
           },
           events: {
@@ -71,8 +132,28 @@ export function GlobalAudioPlayer() {
   }, []);
 
   return (
-    <div style={{ position: 'fixed', bottom: -100, left: -100, width: 1, height: 1, opacity: 0, pointerEvents: 'none', zIndex: -1 }}>
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        right: 0,
+        width: 2,
+        height: 2,
+        opacity: 0.01,
+        pointerEvents: 'none',
+        zIndex: -1,
+        overflow: 'hidden',
+      }}
+      aria-hidden="true"
+    >
       <div id="yt-player-engine"></div>
+      <audio
+        ref={silentAudioRef}
+        src={SILENT_WAV_LOOP}
+        loop
+        preload="auto"
+        playsInline
+      />
     </div>
   );
 }

@@ -493,8 +493,12 @@ export async function ytGetArtist(artistNameOrId: string): Promise<YtArtistDetai
         const cardTitle = card.title?.runs?.[0]?.text || '';
         const cardBrowseId = card.navigationEndpoint?.browseEndpoint?.browseId || '';
         const year = card.subtitle?.runs?.map((r: any) => r.text).join('') || '';
-        const thumbs = card.thumbnailRenderer?.musicThumbnailRenderer?.thumbnail?.thumbnails;
-        const thumb = getBestThumbnail(thumbs);
+        const thumbs =
+          card.thumbnailRenderer?.musicThumbnailRenderer?.thumbnail?.thumbnails ||
+          card.thumbnailRenderer?.croppedSquareThumbnailRenderer?.thumbnail?.thumbnails ||
+          card.thumbnail?.thumbnails ||
+          card.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails;
+        const thumb = getBestThumbnail(thumbs) || avatar || '';
 
         if (sectionTitle.includes('album')) {
           albums.push({ id: cardBrowseId, title: cardTitle, type: 'Album', year, thumb });

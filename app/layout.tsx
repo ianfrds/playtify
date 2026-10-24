@@ -5,13 +5,18 @@ import { AudioProvider } from '@/context/AudioContext';
 import AppShell from '@/components/layout/AppShell';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://playtifyy.vercel.app'),
-  title: 'Playtify - Pemutar Musik Online Modern',
+  metadataBase: new URL('https://haytify.vercel.app'),
+  title: 'Haytify - Pemutar Musik Online Modern',
   description: 'Streaming musik bebas hambatan dengan rekomendasi YouTube terupdate, profil artis lengkap, dan audio stabil.',
   manifest: '/manifest.json',
   icons: {
-    icon: '/icon-192.png',
-    apple: '/icon-192.png',
+    icon: '/logo.png',
+    apple: '/logo.png',
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Haytify',
   },
 };
 
@@ -31,6 +36,11 @@ export default function RootLayout({
   return (
     <html lang="id">
       <head>
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Haytify" />
+        <meta name="application-name" content="Haytify" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

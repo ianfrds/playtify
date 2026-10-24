@@ -6,7 +6,7 @@ import { useAudio } from '@/context/AudioContext';
 const PRESET_COVERS = [
   'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=600&auto=format&fit=crop&q=80',
   'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80',
-  'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=600&auto=format&fit=crop&q=80',
   'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80',
   'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&auto=format&fit=crop&q=80',
 ];
@@ -187,7 +187,7 @@ export function EditPlaylistModal() {
           </div>
 
           <p style={{ fontSize: '0.75rem', color: '#777', marginTop: 16 }}>
-            Dengan melanjutkan, kamu menyetujui untuk memberikan akses gambar yang kamu miliki ke Playtify.
+            Dengan melanjutkan, kamu menyetujui untuk memberikan akses gambar yang kamu miliki ke Haytify.
           </p>
 
           <div className="modal-actions" style={{ marginTop: 20 }}>

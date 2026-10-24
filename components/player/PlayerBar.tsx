@@ -23,9 +23,12 @@ export function PlayerBar() {
     toggleLike,
     isLiked,
     toggleRecDrawer,
+    toggleNowPlayingSidebar,
+    isNowPlayingSidebarOpen,
     toggleQueueSidebar,
-    toggleLyricsModal,
-    isLyricsModalOpen,
+    isQueueSidebarOpen,
+    toggleLyricsSidebar,
+    isLyricsSidebarOpen,
   } = useAudio();
 
   const router = useRouter();
@@ -77,7 +80,15 @@ export function PlayerBar() {
           title="Buka Sedang Diputar"
         >
           {thumbUrl ? (
-            <img id="player-thumb" src={thumbUrl} alt={currentTrack?.title || ''} loading="lazy" />
+            <img
+              id="player-thumb"
+              src={thumbUrl}
+              alt={currentTrack?.title || ''}
+              loading="lazy"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = '/logo.png';
+              }}
+            />
           ) : (
             <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555' }}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
@@ -91,7 +102,7 @@ export function PlayerBar() {
             {currentTrack?.title || 'Belum ada lagu'}
           </p>
           <p id="player-artist" className="player-artist clickable-artist" onClick={handleArtistClick}>
-            {currentTrack?.artist || 'Playtify Music'}
+            {currentTrack?.artist || 'Haytify Music'}
           </p>
         </div>
         {currentTrack && (
@@ -222,24 +233,31 @@ export function PlayerBar() {
       <div className="player-extra">
         <button
           id="btn-player-now-playing"
-          className="icon-btn"
-          onClick={() => router.push('/now-playing')}
-          title="Tampilan Now Playing"
-          aria-label="Tampilan Now Playing"
+          className={`icon-btn ${isNowPlayingSidebarOpen ? 'active' : ''}`}
+          onClick={() => {
+            if (typeof window !== 'undefined' && window.innerWidth > 768) {
+              toggleNowPlayingSidebar();
+            } else {
+              router.push('/now-playing');
+            }
+          }}
+          title="Tampilan Sedang Memutar"
+          aria-label="Tampilan Sedang Memutar"
+          style={{ color: isNowPlayingSidebarOpen ? 'var(--accent)' : 'inherit' }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" />
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <line x1="15" y1="3" x2="15" y2="21" />
           </svg>
         </button>
 
         <button
           id="btn-player-lyrics"
-          className={`icon-btn ${isLyricsModalOpen ? 'active' : ''}`}
-          onClick={() => toggleLyricsModal()}
+          className={`icon-btn ${isLyricsSidebarOpen ? 'active' : ''}`}
+          onClick={() => toggleLyricsSidebar()}
           title="Lirik Lagu (Sinkron)"
           aria-label="Lirik Lagu"
-          style={{ color: isLyricsModalOpen ? 'var(--accent)' : 'inherit' }}
+          style={{ color: isLyricsSidebarOpen ? 'var(--accent)' : 'inherit' }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zm5.3 7.7a1 1 0 0 0-2 .2c0 2.9-2.4 5.3-5.3 5.3s-5.3-2.4-5.3-5.3a1 1 0 1 0-2-.2C3 13.5 5.9 17 9.8 17.2V20H7a1 1 0 0 0 0 2h10a1 1 0 0 0 0-2h-2.8v-2.8c3.9-.2 6.8-3.7 3.1-7.5z" />
@@ -260,10 +278,11 @@ export function PlayerBar() {
 
         <button
           id="btn-player-queue"
-          className="icon-btn"
+          className={`icon-btn ${isQueueSidebarOpen ? 'active' : ''}`}
           onClick={() => toggleQueueSidebar()}
-          title="Queue / Antrian lagu"
-          aria-label="Queue / Antrian lagu"
+          title="Antrean lagu"
+          aria-label="Antrean lagu"
+          style={{ color: isQueueSidebarOpen ? 'var(--accent)' : 'inherit' }}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="8" y1="6" x2="21" y2="6" />

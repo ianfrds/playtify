@@ -5,16 +5,16 @@ import { useRouter } from 'next/navigation';
 import { useAudio } from '@/context/AudioContext';
 import TrackCard from '@/components/tracks/TrackCard';
 import PlaylistCard from '@/components/playlists/PlaylistCard';
-import { CURATED_PLAYLISTS, RECOMMENDATIONS_DATA } from '@/data/recommendations';
+import { RECOMMENDATIONS_DATA } from '@/data/recommendations';
 
 export default function HomePage() {
   const router = useRouter();
   const {
     recommendations,
     smartRecommendations,
+    curatedPlaylists,
     userTasteProfile,
     history,
-    refreshRecommendations,
     playTrack,
     currentTrack,
     isPlaying,
@@ -25,7 +25,6 @@ export default function HomePage() {
     openAuthModal,
   } = useAudio();
 
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const getGreeting = () => {
@@ -34,15 +33,6 @@ export default function HomePage() {
     if (hour < 15) return 'Selamat siang';
     if (hour < 19) return 'Selamat sore';
     return 'Selamat malam';
-  };
-
-  const handleManualRefresh = async () => {
-    try {
-      setIsRefreshing(true);
-      await refreshRecommendations();
-    } finally {
-      setIsRefreshing(false);
-    }
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -55,12 +45,12 @@ export default function HomePage() {
   };
 
   const mixes = [
-    { name: 'Top Hits Indonesia', key: 'top_indo', tracks: RECOMMENDATIONS_DATA.top_indo },
-    { name: "Today's Top Hits Dunia", key: 'global_hits', tracks: RECOMMENDATIONS_DATA.global_hits },
-    { name: 'Santai & Akustik Sore', key: 'chill_vibes', tracks: RECOMMENDATIONS_DATA.chill_vibes },
-    { name: 'Lofi Beats & Fokus', key: 'lofi', tracks: RECOMMENDATIONS_DATA.lofi },
-    { name: 'K-Pop Terpopuler', key: 'kpop', tracks: RECOMMENDATIONS_DATA.kpop },
-    { name: 'Nostalgia Pop Rock', key: 'nostalgia', tracks: RECOMMENDATIONS_DATA.nostalgia },
+    { name: 'Top Hits Indonesia', key: 'top_indo', playlistId: 'top-indo', tracks: RECOMMENDATIONS_DATA.top_indo },
+    { name: "Today's Top Hits Dunia", key: 'global_hits', playlistId: 'global-hits', tracks: RECOMMENDATIONS_DATA.global_hits },
+    { name: 'Santai & Akustik Sore', key: 'chill_vibes', playlistId: 'chill-vibes', tracks: RECOMMENDATIONS_DATA.chill_vibes },
+    { name: 'Lofi Beats & Fokus', key: 'lofi', playlistId: 'lofi-beats', tracks: RECOMMENDATIONS_DATA.lofi },
+    { name: 'K-Pop Terpopuler', key: 'kpop', playlistId: 'kpop-hits', tracks: RECOMMENDATIONS_DATA.kpop },
+    { name: 'Nostalgia Pop Rock', key: 'nostalgia', playlistId: 'nostalgia-indo', tracks: RECOMMENDATIONS_DATA.nostalgia },
   ];
 
   const topIndoTracks = RECOMMENDATIONS_DATA.top_indo || [];
@@ -83,7 +73,7 @@ export default function HomePage() {
               if (user) {
                 router.push('/login');
               } else {
-                openAuthModal('Masuk ke Playtify', 'Nikmati playlist tanpa batas dan sinkronkan lagu favoritmu.');
+                openAuthModal('Masuk ke Haytify', 'Nikmati playlist tanpa batas dan sinkronkan lagu favoritmu.');
               }
             }}
             role="button"
@@ -118,30 +108,11 @@ export default function HomePage() {
           <div className="mobile-user-text">
             <span className="mobile-greeting-label">{getGreeting()}!</span>
             <p className="mobile-user-name">
-              {user ? (user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0]) : 'Tamu Playtify'}
+              {user ? (user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0]) : 'Tamu Haytify'}
             </p>
           </div>
         </div>
         <div className="mobile-top-actions">
-          <button
-            className="mobile-notification-pill"
-            onClick={handleManualRefresh}
-            title="Update Rekomendasi"
-            aria-label="Update Rekomendasi"
-          >
-            <span className="mobile-pill-badge">{recommendations.length}</span>
-            <svg
-              className={isRefreshing ? 'spin' : ''}
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-            </svg>
-          </button>
           <button
             className="mobile-icon-circle"
             onClick={() => router.push('/liked')}
@@ -155,18 +126,10 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ─── Mobile Hero Headline (Screen 1 style) ─── */}
-      <div className="mobile-hero-wrap">
-        <h1 className="mobile-hero-title">SoundGroove Your Music, Anytime</h1>
-      </div>
-
       {/* ─── Top Greeting & Search Header (Desktop) ─── */}
       <div className="home-top-bar">
         <div className="home-greeting-wrap">
           <h1 id="home-greeting">{getGreeting()}</h1>
-          <p className="subtitle" id="home-greeting-sub">
-            Rekomendasi musik pilihan dari YouTube khusus untukmu (Auto-update tiap 30 menit)
-          </p>
         </div>
         <div className="home-search-wrap">
           <form onSubmit={handleSearchSubmit} className="search-box-large">
@@ -237,9 +200,12 @@ export default function HomePage() {
             </div>
             <div className="mobile-curated-thumb-side">
               <img
-                src={featuredTrack.thumbnail || featuredTrack.thumb}
+                src={featuredTrack.thumbnail || featuredTrack.thumb || '/logo.png'}
                 alt={featuredTrack.title}
                 loading="lazy"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/logo.png';
+                }}
               />
             </div>
           </div>
@@ -251,24 +217,33 @@ export default function HomePage() {
         {mixes.map((m) => {
           const leadTrack = m.tracks[0];
           const isThisPlaying = currentTrack?.id === leadTrack?.id && isPlaying;
+          const thumbUrl = leadTrack?.thumbnail || leadTrack?.thumb || '/logo.png';
           return (
             <div
               key={m.key}
               className={`quick-mix-card ${isThisPlaying ? 'playing' : ''}`}
-              onClick={() => leadTrack && playTrack(leadTrack, m.tracks)}
+              onClick={() => router.push(`/playlist/${m.playlistId}`)}
               role="button"
               tabIndex={0}
+              title={`Buka playlist ${m.name}`}
             >
               <div className="quick-mix-thumb">
                 <img
-                  src={leadTrack?.thumbnail || leadTrack?.thumb}
+                  src={thumbUrl}
                   alt={m.name}
                   loading="lazy"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = '/logo.png';
+                  }}
                 />
               </div>
               <span className="quick-mix-title">{m.name}</span>
               <button
                 className="quick-mix-play"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (leadTrack) playTrack(leadTrack, m.tracks);
+                }}
                 title={`Putar ${m.name}`}
                 aria-label={`Putar ${m.name}`}
               >
@@ -292,56 +267,7 @@ export default function HomePage() {
         {/* Shelf: Rekomendasi Pintar Berdasarkan Selera Musik User */}
         <section className="shelf-section" id="shelf-smart-recommendations">
           <div className="shelf-header">
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                <span
-                  style={{
-                    background: 'linear-gradient(135deg, #1ed760 0%, #1db954 100%)',
-                    color: '#000',
-                    fontSize: '0.68rem',
-                    fontWeight: 800,
-                    letterSpacing: '0.06em',
-                    padding: '2px 8px',
-                    borderRadius: 4,
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  ✨ Rekomendasi Pintar
-                </span>
-                {userTasteProfile.topGenre && (
-                  <span
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.08)',
-                      color: '#ddd',
-                      fontSize: '0.68rem',
-                      fontWeight: 700,
-                      padding: '2px 8px',
-                      borderRadius: 4,
-                    }}
-                  >
-                    Genre: {userTasteProfile.topGenre}
-                  </span>
-                )}
-              </div>
-              <h2>Dibuat Khusus untuk Kamu</h2>
-              <p className="subtitle">{userTasteProfile.summary}</p>
-            </div>
-            <div className="shelf-nav-actions">
-              <button
-                className="btn-pill-play shelf-play-all"
-                onClick={() => {
-                  if (smartRecommendations.length > 0) {
-                    playTrack(smartRecommendations[0], smartRecommendations);
-                  }
-                }}
-                title="Putar semua rekomendasi pintar"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                Putar Semua
-              </button>
-            </div>
+            <h2>Dibuat Khusus untuk Kamu</h2>
           </div>
           <div className="shelf-row-wrap">
             <div className="shelf-row" id="shelf-row-smart">
@@ -360,22 +286,7 @@ export default function HomePage() {
         {history.length > 0 && (
           <section className="shelf-section" id="shelf-recently-played">
             <div className="shelf-header">
-              <div>
-                <h2>Baru Saja Diputar</h2>
-                <p className="subtitle">Lanjutkan mendengarkan lagu terakhir yang kamu nikmati</p>
-              </div>
-              <div className="shelf-nav-actions">
-                <button
-                  className="btn-pill-play shelf-play-all"
-                  onClick={() => playTrack(history[0], history)}
-                  title="Putar riwayat lagu"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                  Putar Semua
-                </button>
-              </div>
+              <h2>Baru Saja Diputar</h2>
             </div>
             <div className="shelf-row-wrap">
               <div className="shelf-row" id="shelf-row-history">
@@ -394,36 +305,11 @@ export default function HomePage() {
         {/* Shelf: Rekomendasi Playlist Populer */}
         <section className="shelf-section" id="shelf-playlists">
           <div className="shelf-header">
-            <div>
-              <h2>Rekomendasi Playlist Populer</h2>
-              <p className="subtitle">Kumpulan playlist pilihan Spotify-style dengan daftar lagu lengkap</p>
-            </div>
-            <div className="shelf-nav-actions">
-              <button
-                className={`btn-pill-play ${isRefreshing ? 'loading' : ''}`}
-                onClick={handleManualRefresh}
-                title="Update rekomendasi dari YouTube sekarang"
-              >
-                <svg
-                  className={isRefreshing ? 'spin' : ''}
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
-                  <polyline points="23 4 23 10 17 10" />
-                  <polyline points="1 20 1 14 7 14" />
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                </svg>
-                <span>{isRefreshing ? 'Memperbarui...' : 'Update Rekomendasi'}</span>
-              </button>
-            </div>
+            <h2>Rekomendasi Playlist Populer</h2>
           </div>
           <div className="shelf-row-wrap">
             <div className="shelf-row playlist-shelf-row" id="shelf-row-playlists">
-              {CURATED_PLAYLISTS.map((p) => (
+              {curatedPlaylists.map((p) => (
                 <PlaylistCard key={p.id} playlist={p} />
               ))}
             </div>
@@ -433,24 +319,7 @@ export default function HomePage() {
         {/* Shelf: Tangga Lagu Terpopuler Indonesia */}
         <section className="shelf-section" id="shelf-top_indo">
           <div className="shelf-header">
-            <div>
-              <h2>Tangga Lagu Terpopuler Indonesia</h2>
-              <p className="subtitle">Lagu-lagu yang paling banyak didengar dan hits di Indonesia</p>
-            </div>
-            <div className="shelf-nav-actions">
-              <button
-                className="btn-pill-play shelf-play-all"
-                onClick={() => {
-                  const list = topIndoTracks.length > 0 ? topIndoTracks : recommendations.slice(0, 8);
-                  if (list.length > 0) playTrack(list[0], list);
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                Putar Semua
-              </button>
-            </div>
+            <h2>Tangga Lagu Terpopuler Indonesia</h2>
           </div>
           <div className="shelf-row-wrap">
             <div className="shelf-row" id="shelf-row-top_indo">
@@ -468,23 +337,7 @@ export default function HomePage() {
         {/* Shelf: Today's Top Hits Mancanegara */}
         <section className="shelf-section" id="shelf-global_hits">
           <div className="shelf-header">
-            <div>
-              <h2>Today&apos;s Top Hits Mancanegara</h2>
-              <p className="subtitle">Deretan hits internasional paling populer di dunia saat ini</p>
-            </div>
-            <div className="shelf-nav-actions">
-              <button
-                className="btn-pill-play shelf-play-all"
-                onClick={() => {
-                  if (globalTracks.length > 0) playTrack(globalTracks[0], globalTracks);
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                Putar Semua
-              </button>
-            </div>
+            <h2>Today&apos;s Top Hits Mancanegara</h2>
           </div>
           <div className="shelf-row-wrap">
             <div className="shelf-row" id="shelf-row-global_hits">
@@ -502,23 +355,7 @@ export default function HomePage() {
         {/* Shelf: Santai & Akustik Sore */}
         <section className="shelf-section" id="shelf-chill_vibes">
           <div className="shelf-header">
-            <div>
-              <h2>Santai & Akustik Sore</h2>
-              <p className="subtitle">Lagu indie dan akustik syahdu menemani waktu rehat</p>
-            </div>
-            <div className="shelf-nav-actions">
-              <button
-                className="btn-pill-play shelf-play-all"
-                onClick={() => {
-                  if (chillTracks.length > 0) playTrack(chillTracks[0], chillTracks);
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                Putar Semua
-              </button>
-            </div>
+            <h2>Santai & Akustik Sore</h2>
           </div>
           <div className="shelf-row-wrap">
             <div className="shelf-row" id="shelf-row-chill_vibes">
@@ -536,23 +373,7 @@ export default function HomePage() {
         {/* Shelf: Nostalgia Pop Rock Indo */}
         <section className="shelf-section" id="shelf-nostalgia">
           <div className="shelf-header">
-            <div>
-              <h2>Nostalgia Pop Rock Indonesia</h2>
-              <p className="subtitle">Karya legendaris Sheila On 7, Dewa 19, Peterpan, dan Padi</p>
-            </div>
-            <div className="shelf-nav-actions">
-              <button
-                className="btn-pill-play shelf-play-all"
-                onClick={() => {
-                  if (nostalgiaTracks.length > 0) playTrack(nostalgiaTracks[0], nostalgiaTracks);
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                Putar Semua
-              </button>
-            </div>
+            <h2>Nostalgia Pop Rock Indonesia</h2>
           </div>
           <div className="shelf-row-wrap">
             <div className="shelf-row" id="shelf-row-nostalgia">
@@ -570,23 +391,7 @@ export default function HomePage() {
         {/* Shelf: K-Pop & Asian Hits */}
         <section className="shelf-section" id="shelf-kpop">
           <div className="shelf-header">
-            <div>
-              <h2>K-Pop & Asian Super Hits</h2>
-              <p className="subtitle">Hits paling bertenaga dari NewJeans, BTS, BLACKPINK, dan YOASOBI</p>
-            </div>
-            <div className="shelf-nav-actions">
-              <button
-                className="btn-pill-play shelf-play-all"
-                onClick={() => {
-                  if (kpopTracks.length > 0) playTrack(kpopTracks[0], kpopTracks);
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                Putar Semua
-              </button>
-            </div>
+            <h2>K-Pop & Asian Super Hits</h2>
           </div>
           <div className="shelf-row-wrap">
             <div className="shelf-row" id="shelf-row-kpop">

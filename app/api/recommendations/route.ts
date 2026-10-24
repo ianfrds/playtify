@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { CURATED_PLAYLISTS, RECOMMENDATIONS_DATA } from '@/data/recommendations';
 import { Track } from '@/types';
+import { sanitizeTracks } from '@/lib/trackSanitizer';
+
+export const revalidate = 86400; // 24 hours (86,400 seconds)
 
 const PIPED_INSTANCES = [
   'https://api.piped.private.coffee',
@@ -22,14 +25,14 @@ export async function GET(request: Request) {
         const res = await fetch(`${base}/trending?region=ID`, {
           signal: controller.signal,
           headers: { 'Accept': 'application/json' },
-          next: { revalidate: 1800 } // revalidate every 30 mins
+          next: { revalidate: 86400 } // revalidate every 24 hours
         });
         clearTimeout(timeout);
 
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
-            liveTrending = data.slice(0, 10).map((item: any) => ({
+            const rawTrending = data.slice(0, 10).map((item: any) => ({
               id: item.url ? item.url.replace('/watch?v=', '') : item.id,
               title: item.title || 'Lagu Trending',
               artist: item.uploaderName || item.artist || 'Artis Populer',
@@ -37,6 +40,7 @@ export async function GET(request: Request) {
               duration: item.duration || 210,
               source: 'piped-trending'
             })).filter((t: Track) => t.id && t.title);
+            liveTrending = sanitizeTracks(rawTrending);
             if (liveTrending.length > 0) break;
           }
         }

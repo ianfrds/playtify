@@ -4,6 +4,7 @@ import React from 'react';
 import { Track } from '@/types';
 import { useAudio } from '@/context/AudioContext';
 import { useRouter } from 'next/navigation';
+import { sanitizeTrack, DEFAULT_FALLBACK_COVER } from '@/lib/trackSanitizer';
 
 interface TrackCardProps {
   track: Track;
@@ -11,13 +12,14 @@ interface TrackCardProps {
   queueContext?: Track[];
 }
 
-export function TrackCard({ track, onPlay, queueContext }: TrackCardProps) {
+export function TrackCard({ track: rawTrack, onPlay, queueContext }: TrackCardProps) {
+  const track = sanitizeTrack(rawTrack);
   const { currentTrack, isPlaying, playTrack } = useAudio();
   const router = useRouter();
 
   const isCurrent = currentTrack?.id === track.id;
   const isThisPlaying = isCurrent && isPlaying;
-  const thumbUrl = track.thumbnail || track.thumb || 'https://i.ytimg.com/vi/WKZO-CWeOVA/hqdefault.jpg';
+  const thumbUrl = track.thumbnail || track.thumb || DEFAULT_FALLBACK_COVER;
 
   const handlePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -43,7 +45,14 @@ export function TrackCard({ track, onPlay, queueContext }: TrackCardProps) {
       aria-label={`Putar ${track.title}`}
     >
       <div className="track-card-thumb">
-        <img src={thumbUrl} alt={track.title} loading="lazy" />
+        <img
+          src={thumbUrl}
+          alt={track.title}
+          loading="lazy"
+          onError={(e) => {
+            (e.currentTarget as HTMLImageElement).src = '/logo.png';
+          }}
+        />
         <button
           className="track-card-play"
           title={isThisPlaying ? 'Jeda' : 'Putar'}

@@ -1,6 +1,6 @@
 {
-  "name": "Playtify - Musik & Playlist Streaming",
-  "short_name": "Playtify",
+  "name": "Haytify - Musik & Playlist Streaming",
+  "short_name": "Haytify",
   "description": "Stream musik gratis dari YouTube dengan tampilan premium khas Spotify",
   "start_url": "/",
   "display": "standalone",

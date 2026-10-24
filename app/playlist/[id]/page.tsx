@@ -12,6 +12,7 @@ export default function PlaylistDetailPage() {
   const router = useRouter();
   const {
     playlists,
+    curatedPlaylists,
     playTrack,
     recommendations,
     openEditPlaylistModal,
@@ -22,7 +23,7 @@ export default function PlaylistDetailPage() {
   const playlistId = params?.id as string;
 
   // Search curated playlists first
-  const curated = CURATED_PLAYLISTS.find((p) => p.id === playlistId);
+  const curated = (curatedPlaylists || CURATED_PLAYLISTS).find((p) => p.id === playlistId);
   // Search user playlists
   const userPlaylist = playlists.find((p) => p.id === playlistId);
 
@@ -131,7 +132,7 @@ export default function PlaylistDetailPage() {
             </h1>
             <p className="playlist-desc">{description}</p>
             <div className="playlist-meta" style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', marginTop: 8 }}>
-              <span style={{ color: '#fff', fontWeight: 700 }}>Playtify</span> • <span>{tracks.length} Lagu</span> •{' '}
+              <span style={{ color: '#fff', fontWeight: 700 }}>Haytify</span> • <span>{tracks.length} Lagu</span> •{' '}
               {userPlaylist ? 'Koleksi Kamu' : 'Rekomendasi Terkini'}
             </div>
 

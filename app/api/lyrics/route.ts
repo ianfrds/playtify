@@ -126,7 +126,7 @@ export async function GET(request: Request) {
       const res = await fetch(`https://lrclib.net/api/get?${lrclibParams.toString()}`, {
         signal: controller.signal,
         headers: {
-          'User-Agent': 'Playtify/2.5.0 (https://github.com/ianfrds/playtify)',
+          'User-Agent': 'Haytify/2.5.0 (https://github.com/ianfrds/haytify)',
         },
       });
       clearTimeout(timeout);
@@ -182,7 +182,7 @@ export async function GET(request: Request) {
       { time: 80, text: `♪ Harmoni indah oleh ${rawArtist || 'Artis Terverifikasi'} ♪` },
       { time: 98, text: 'Terus berdendang menemani setiap langkah perjalanan' },
       { time: 118, text: 'Semua rasa bercampur menjadi satu harmoni jiwa' },
-      { time: 140, text: `♪ ${rawTitle || 'Melodi'} - ${rawArtist || 'Playtify'} ♪` },
+      { time: 140, text: `♪ ${rawTitle || 'Melodi'} - ${rawArtist || 'Haytify'} ♪` },
       { time: 165, text: 'Menutup bait dengan kehangatan nada abadi' },
     ],
   };

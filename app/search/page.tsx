@@ -7,6 +7,7 @@ import { Track } from '@/types';
 import TrackRow from '@/components/tracks/TrackRow';
 import PlaylistCard from '@/components/playlists/PlaylistCard';
 import { CURATED_PLAYLISTS, BROWSE_CATEGORIES, ALL_RECOMMENDATIONS_POOL } from '@/data/recommendations';
+import { getArtistAvatar } from '@/data/artists';
 
 interface ArtistResult {
   id: string;
@@ -27,7 +28,7 @@ interface AlbumResult {
 
 export default function SearchPage() {
   const router = useRouter();
-  const { playTrack } = useAudio();
+  const { playTrack, curatedPlaylists } = useAudio();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'songs' | 'artists' | 'albums'>('songs');
   const [results, setResults] = useState<Track[]>([]);
@@ -267,7 +268,7 @@ export default function SearchPage() {
                       }}
                     >
                       <img
-                        src={art.avatar || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200&h=200&fit=crop'}
+                        src={art.avatar || getArtistAvatar(art.name) || '/logo.png'}
                         alt={art.name}
                         loading="lazy"
                         style={{
@@ -279,7 +280,7 @@ export default function SearchPage() {
                           boxShadow: '0 6px 18px rgba(0,0,0,0.5)',
                         }}
                         onError={(e) => {
-                          e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200&h=200&fit=crop';
+                          e.currentTarget.src = getArtistAvatar(art.name) || '/logo.png';
                         }}
                       />
                       <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fff', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -325,7 +326,7 @@ export default function SearchPage() {
                       onClick={() => setQuery(alb.title)}
                     >
                       <img
-                        src={alb.thumb || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&h=300&fit=crop'}
+                        src={alb.thumb || '/logo.png'}
                         alt={alb.title}
                         loading="lazy"
                         style={{
@@ -337,7 +338,7 @@ export default function SearchPage() {
                           boxShadow: '0 6px 18px rgba(0,0,0,0.4)',
                         }}
                         onError={(e) => {
-                          e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&h=300&fit=crop';
+                          e.currentTarget.src = '/logo.png';
                         }}
                       />
                       <h4 style={{ fontSize: '1rem', fontWeight: 800, color: '#fff', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -493,7 +494,7 @@ export default function SearchPage() {
                     className="browse-card-thumb"
                     loading="lazy"
                     onError={(e) => {
-                      e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=160&h=160&fit=crop';
+                      e.currentTarget.src = '/logo.png';
                     }}
                   />
                 </div>
@@ -504,13 +505,10 @@ export default function SearchPage() {
           {/* Section 2: Rekomendasi Playlist Populer */}
           <div className="search-section">
             <div className="shelf-header">
-              <div>
-                <h2>Playlist Pilihan untuk Kamu</h2>
-                <p className="subtitle">Dengarkan koleksi terbaik sesuai suasana hatimu</p>
-              </div>
+              <h2>Playlist Pilihan untuk Kamu</h2>
             </div>
             <div className="shelf-grid">
-              {CURATED_PLAYLISTS.map((pl) => (
+              {curatedPlaylists.map((pl) => (
                 <PlaylistCard key={pl.id} playlist={pl} />
               ))}
             </div>

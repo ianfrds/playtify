@@ -1,8 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
-import { Track, UserPlaylist } from '@/types';
-import { ALL_RECOMMENDATIONS_POOL, RECOMMENDATIONS_DATA } from '@/data/recommendations';
+import { Track, UserPlaylist, CuratedPlaylist } from '@/types';
+import { ALL_RECOMMENDATIONS_POOL, RECOMMENDATIONS_DATA, CURATED_PLAYLISTS } from '@/data/recommendations';
+import { sanitizeTrack, sanitizeTracks } from '@/lib/trackSanitizer';
 import {
   fetchRemotePlaylists,
   upsertRemotePlaylist,
@@ -38,8 +39,11 @@ interface AudioContextType {
   volume: number;
   queue: Track[];
   queueIndex: number;
+  clearQueue: () => void;
+  removeFromQueue: (index: number) => void;
   history: Track[];
   smartRecommendations: Track[];
+  curatedPlaylists: CuratedPlaylist[];
   userTasteProfile: {
     topGenre: string | null;
     topArtist: string | null;
@@ -53,7 +57,11 @@ interface AudioContextType {
   followedArtists: string[];
   recommendations: Track[];
 
+  activeRightSidebar: 'nowPlaying' | 'lyrics' | 'queue' | null;
+  isNowPlayingSidebarOpen: boolean;
   isQueueSidebarOpen: boolean;
+  isLyricsSidebarOpen: boolean;
+  isLyricsFullscreen: boolean;
   isRecDrawerOpen: boolean;
   isNowPlayingModalOpen: boolean;
   isLyricsModalOpen: boolean;
@@ -62,8 +70,15 @@ interface AudioContextType {
   openNewPlaylistModal: () => void;
   toastMessage: string | null;
 
+  toggleNowPlayingSidebar: (force?: boolean) => void;
+  toggleQueueSidebar: (force?: boolean) => void;
+  toggleLyricsSidebar: (force?: boolean) => void;
   toggleLyricsModal: (force?: boolean) => void;
+  openFullscreenLyrics: () => void;
+  closeFullscreenLyrics: () => void;
   setIsLyricsModalOpen: (open: boolean) => void;
+  setIsLyricsSidebarOpen: (open: boolean) => void;
+  setIsLyricsFullscreen: (open: boolean) => void;
 
   playTrack: (track: Track, newQueue?: Track[]) => void;
   togglePlayPause: () => void;
@@ -84,12 +99,11 @@ interface AudioContextType {
   deletePlaylist: (playlistId: string) => void;
   updatePlaylist: (playlistId: string, updates: { name?: string; description?: string; cover?: string }) => void;
   removeTrackFromPlaylist: (playlistId: string, trackId: string) => void;
-  refreshRecommendations: () => Promise<void>;
+  refreshRecommendations: (silent?: boolean) => Promise<void>;
 
   openNowPlayingModal: () => void;
   closeNowPlayingModal: () => void;
   setNowPlayingModalOpen: (open: boolean) => void;
-  toggleQueueSidebar: (force?: boolean) => void;
   toggleRecDrawer: (force?: boolean) => void;
   setIsBrandModalOpen: (open: boolean) => void;
   setIsNewPlaylistModalOpen: (open: boolean) => void;
@@ -122,12 +136,12 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [isGuest, setIsGuest] = useState<boolean>(false);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
-  const [authModalTitle, setAuthModalTitle] = useState<string>('Masuk ke Playtify');
+  const [authModalTitle, setAuthModalTitle] = useState<string>('Masuk ke Haytify');
   const [authModalSubtitle, setAuthModalSubtitle] = useState<string>(
     'Nikmati musik tanpa batas dan sinkronkan playlist di cloud.'
   );
 
-  const [brandName, setBrandNameState] = useState<string>('Playtify');
+  const [brandName, setBrandNameState] = useState<string>('Haytify');
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -139,14 +153,20 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [repeatMode, setRepeatMode] = useState<number>(0); // 0 = off, 1 = all, 2 = one
   const [likedTracks, setLikedTracks] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<UserPlaylist[]>([]);
+  const [curatedPlaylists, setCuratedPlaylists] = useState<CuratedPlaylist[]>(CURATED_PLAYLISTS);
   const [followedArtists, setFollowedArtists] = useState<string[]>([]);
   const [recommendations, setRecommendations] = useState<Track[]>(ALL_RECOMMENDATIONS_POOL);
 
-  // UI states
-  const [isQueueSidebarOpen, setIsQueueSidebarOpen] = useState<boolean>(false);
+  // UI states (Unified right sidebar slot so they never overlap)
+  const [activeRightSidebar, setActiveRightSidebar] = useState<'nowPlaying' | 'lyrics' | 'queue' | null>(null);
+  const [isLyricsFullscreen, setIsLyricsFullscreen] = useState<boolean>(false);
+  const isNowPlayingSidebarOpen = activeRightSidebar === 'nowPlaying';
+  const isLyricsSidebarOpen = activeRightSidebar === 'lyrics';
+  const isQueueSidebarOpen = activeRightSidebar === 'queue';
+  const isLyricsModalOpen = isLyricsSidebarOpen || isLyricsFullscreen;
+
   const [isRecDrawerOpen, setIsRecDrawerOpen] = useState<boolean>(false);
   const [isNowPlayingModalOpen, setIsNowPlayingModalOpen] = useState<boolean>(false);
-  const [isLyricsModalOpen, setIsLyricsModalOpen] = useState<boolean>(false);
   const [isBrandModalOpen, setIsBrandModalOpen] = useState<boolean>(false);
   const [isNewPlaylistModalOpen, setIsNewPlaylistModalOpen] = useState<boolean>(false);
   const [isEditPlaylistModalOpen, setIsEditPlaylistModalOpen] = useState<boolean>(false);
@@ -166,8 +186,8 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }, 2800);
   };
 
-  // Live Auto-Updating Recommendations logic
-  const refreshRecommendations = async () => {
+  // Live Auto-Updating Recommendations logic (Updates every 24 hours automatically)
+  const refreshRecommendations = async (silent = false) => {
     try {
       const res = await fetch('/api/recommendations?refresh=true');
       if (res.ok) {
@@ -183,16 +203,26 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
             badge: t.badge || 'UPDATE TERKINI',
             artistId: t.artistId || t.artist.toLowerCase().replace(/[^a-z0-9]/g, '-'),
           }));
-          setRecommendations(mapped);
-          showToast('Playlist rekomendasi berhasil diperbarui');
-          return;
+          setRecommendations(sanitizeTracks(mapped));
         }
+
+        if (data.playlists && Array.isArray(data.playlists) && data.playlists.length > 0) {
+          const cleanedPlaylists = data.playlists.map((pl: CuratedPlaylist) => ({
+            ...pl,
+            tracks: sanitizeTracks(pl.tracks || []),
+          }));
+          setCuratedPlaylists(cleanedPlaylists);
+          localStorage.setItem('playtify_curated_playlists', JSON.stringify(cleanedPlaylists));
+        }
+
+        localStorage.setItem('playtify_playlists_last_updated', Date.now().toString());
+        if (!silent) showToast('Playlist rekomendasi diperbarui');
+        return;
       }
     } catch (e) {
       console.warn('Live recommendation fetch failed, using fallback pool:', e);
     }
-    setRecommendations(ALL_RECOMMENDATIONS_POOL);
-    showToast('Playlist rekomendasi diperbarui');
+    setRecommendations(sanitizeTracks(ALL_RECOMMENDATIONS_POOL));
   };
 
   // Load initial persistent state from localStorage
@@ -201,27 +231,60 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       const savedGuest = localStorage.getItem('playtify_guest');
       if (savedGuest === 'true') setIsGuest(true);
 
-      const savedBrand = localStorage.getItem('playtify_brand');
-      if (savedBrand) setBrandNameState(savedBrand);
+      const savedBrand = localStorage.getItem('haytify_brand') || localStorage.getItem('playtify_brand');
+      if (savedBrand && savedBrand !== 'Playtify') {
+        setBrandNameState(savedBrand);
+      } else {
+        setBrandNameState('Haytify');
+      }
 
       const savedVol = localStorage.getItem('playtify_volume');
       if (savedVol) setVolumeState(parseFloat(savedVol));
 
       const savedLiked = localStorage.getItem('playtify_liked');
-      if (savedLiked) setLikedTracks(JSON.parse(savedLiked));
+      if (savedLiked) setLikedTracks(sanitizeTracks(JSON.parse(savedLiked)));
 
       const savedPlaylists = localStorage.getItem('playtify_playlists');
-      if (savedPlaylists) setPlaylists(JSON.parse(savedPlaylists));
+      if (savedPlaylists) {
+        const parsed = JSON.parse(savedPlaylists);
+        const cleaned = parsed.map((pl: any) => ({
+          ...pl,
+          tracks: sanitizeTracks(pl.tracks || []),
+        }));
+        setPlaylists(cleaned);
+      }
 
       const savedFollowed = localStorage.getItem('playtify_followed_artists');
       if (savedFollowed) setFollowedArtists(JSON.parse(savedFollowed));
 
       const savedHistory = localStorage.getItem('playtify_playback_history');
-      if (savedHistory) setHistory(JSON.parse(savedHistory));
+      if (savedHistory) setHistory(sanitizeTracks(JSON.parse(savedHistory)));
+
+      const savedCurated = localStorage.getItem('playtify_curated_playlists');
+      if (savedCurated) {
+        try {
+          const parsed = JSON.parse(savedCurated);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCuratedPlaylists(parsed);
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // Check 24-hour auto-update for Rekomendasi Playlist Populer
+      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+      const lastUpdatedStr = localStorage.getItem('playtify_playlists_last_updated');
+      const lastUpdated = lastUpdatedStr ? parseInt(lastUpdatedStr, 10) : 0;
+      const now = Date.now();
+
+      if (!lastUpdated || (now - lastUpdated) >= TWENTY_FOUR_HOURS) {
+        refreshRecommendations(true);
+      }
 
       const initialPool = RECOMMENDATIONS_DATA.top_indo || [];
       if (initialPool.length > 0) {
-        setQueue(initialPool.slice(1));
+        setQueue(sanitizeTracks(initialPool.slice(1)));
       }
     } catch (e) {
       // Ignore
@@ -271,10 +334,15 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       setIsAuthLoading(false);
     }
 
-    // Auto-update recommendations every 30 minutes in background
+    // Periodic check every hour: auto-updates recommendations every 24 hours
     const timer = setInterval(() => {
-      refreshRecommendations();
-    }, 30 * 60 * 1000);
+      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+      const lastUpdatedStr = localStorage.getItem('playtify_playlists_last_updated');
+      const lastUpdated = lastUpdatedStr ? parseInt(lastUpdatedStr, 10) : 0;
+      if (Date.now() - lastUpdated >= TWENTY_FOUR_HOURS) {
+        refreshRecommendations(true);
+      }
+    }, 60 * 60 * 1000);
 
     return () => {
       clearInterval(timer);
@@ -284,7 +352,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
   const openAuthModal = (title?: string, subtitle?: string) => {
     if (title) setAuthModalTitle(title);
-    else setAuthModalTitle('Masuk ke Playtify');
+    else setAuthModalTitle('Masuk ke Haytify');
     if (subtitle) setAuthModalSubtitle(subtitle);
     else setAuthModalSubtitle('Nikmati musik tanpa batas dan sinkronkan playlist di cloud.');
     setIsAuthModalOpen(true);
@@ -299,7 +367,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     try {
       localStorage.setItem('playtify_guest', 'true');
     } catch {}
-    showToast('Selamat menikmati musik di Playtify!');
+    showToast('Selamat menikmati musik di Haytify!');
   };
 
   const signOut = async () => {
@@ -315,12 +383,15 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
   const setBrandName = (name: string) => {
     setBrandNameState(name);
+    localStorage.setItem('haytify_brand', name);
     localStorage.setItem('playtify_brand', name);
     document.title = `${name} - Web Music Streaming`;
     showToast(`Brand diubah menjadi "${name}"`);
   };
 
-  const playTrack = (track: Track, newQueue?: Track[]) => {
+  const playTrack = (rawTrack: Track, rawQueue?: Track[]) => {
+    const track = sanitizeTrack(rawTrack);
+    const newQueue = rawQueue ? sanitizeTracks(rawQueue) : undefined;
     if (track) {
       setHistory((prev) => {
         const filtered = prev.filter((t) => t.id !== track.id);
@@ -488,6 +559,16 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const clearQueue = () => {
+    setQueue([]);
+    showToast('Antrean dibersihkan');
+  };
+
+  const removeFromQueue = (index: number) => {
+    setQueue((prev) => prev.filter((_, i) => i !== index));
+    showToast('Lagu dihapus dari antrean');
+  };
+
   const seekTo = (seconds: number) => {
     setCurrentTime(seconds);
     if (playerRef.current?.seekTo) {
@@ -525,7 +606,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       openAuthModal(
         'Masuk untuk Menyimpan Favorit',
-        'Simpan lagu favoritmu dan sinkronkan di semua perangkat dengan masuk ke akun Playtify.'
+        'Simpan lagu favoritmu dan sinkronkan di semua perangkat dengan masuk ke akun Haytify.'
       );
       return;
     }
@@ -558,7 +639,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       openAuthModal(
         'Masuk untuk Mengikuti Artis',
-        'Ikuti artis favoritmu untuk rilis musik terbaru dengan akun Playtify.'
+        'Ikuti artis favoritmu untuk rilis musik terbaru dengan akun Haytify.'
       );
       return;
     }
@@ -589,7 +670,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       openAuthModal(
         'Masuk untuk Membuat Playlist',
-        'Kumpulkan musik kesukaanmu dalam playlist pribadi dengan membuat atau masuk ke akun Playtify.'
+        'Kumpulkan musik kesukaanmu dalam playlist pribadi dengan membuat atau masuk ke akun Haytify.'
       );
       return;
     }
@@ -600,7 +681,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       openAuthModal(
         'Masuk untuk Membuat Playlist',
-        'Kumpulkan musik kesukaanmu dalam playlist pribadi dengan membuat atau masuk ke akun Playtify.'
+        'Kumpulkan musik kesukaanmu dalam playlist pribadi dengan membuat atau masuk ke akun Haytify.'
       );
       return;
     }
@@ -653,7 +734,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       openAuthModal(
         'Masuk untuk Mengubah Playlist',
-        'Masuk ke akun Playtify untuk mengedit playlist.'
+        'Masuk ke akun Haytify untuk mengedit playlist.'
       );
       return;
     }
@@ -670,7 +751,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if (!user) {
       openAuthModal(
         'Masuk untuk Menghapus Playlist',
-        'Masuk ke akun Playtify untuk mengelola playlist.'
+        'Masuk ke akun Haytify untuk mengelola playlist.'
       );
       return;
     }
@@ -756,9 +837,43 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const openNowPlayingModal = () => setIsNowPlayingModalOpen(true);
   const closeNowPlayingModal = () => setIsNowPlayingModalOpen(false);
   const setNowPlayingModalOpen = (open: boolean) => setIsNowPlayingModalOpen(open);
-  const toggleQueueSidebar = (force?: boolean) => setIsQueueSidebarOpen((p) => (force !== undefined ? force : !p));
+
+  const toggleNowPlayingSidebar = (force?: boolean) => {
+    setActiveRightSidebar((prev) => {
+      if (force === true) return 'nowPlaying';
+      if (force === false) return prev === 'nowPlaying' ? null : prev;
+      return prev === 'nowPlaying' ? null : 'nowPlaying';
+    });
+  };
+
+  const toggleQueueSidebar = (force?: boolean) => {
+    setActiveRightSidebar((prev) => {
+      if (force === true) return 'queue';
+      if (force === false) return prev === 'queue' ? null : prev;
+      return prev === 'queue' ? null : 'queue';
+    });
+  };
+
+  const toggleLyricsSidebar = (force?: boolean) => {
+    setActiveRightSidebar((prev) => {
+      if (force === true) return 'lyrics';
+      if (force === false) return prev === 'lyrics' ? null : prev;
+      return prev === 'lyrics' ? null : 'lyrics';
+    });
+  };
+
+  const toggleLyricsModal = toggleLyricsSidebar;
+  const openFullscreenLyrics = () => setIsLyricsFullscreen(true);
+  const closeFullscreenLyrics = () => setIsLyricsFullscreen(false);
+  const setIsLyricsSidebarOpen = (open: boolean) => toggleLyricsSidebar(open);
+  const setIsLyricsModalOpen = (open: boolean) => {
+    if (open) setIsLyricsFullscreen(true);
+    else {
+      setIsLyricsFullscreen(false);
+      toggleLyricsSidebar(false);
+    }
+  };
   const toggleRecDrawer = (force?: boolean) => setIsRecDrawerOpen((p) => (force !== undefined ? force : !p));
-  const toggleLyricsModal = (force?: boolean) => setIsLyricsModalOpen((p) => (force !== undefined ? force : !p));
 
   const setPlayer = (p: any) => {
     playerRef.current = p;
@@ -791,6 +906,87 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const repeatModeLabel = repeatMode === 2 ? 'one' : repeatMode === 1 ? 'all' : 'off';
   const queueIndex = currentTrack ? queue.findIndex((t) => t.id === currentTrack.id) : 0;
 
+  // MediaSession API for mobile lock screen & background controls
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+
+    if (currentTrack) {
+      const artwork = [
+        { src: currentTrack.thumb || '/icon-192.png', sizes: '96x96', type: 'image/jpeg' },
+        { src: currentTrack.thumb || '/icon-192.png', sizes: '128x128', type: 'image/jpeg' },
+        { src: currentTrack.thumb || '/icon-192.png', sizes: '192x192', type: 'image/jpeg' },
+        { src: currentTrack.thumb || '/icon-512.png', sizes: '256x256', type: 'image/jpeg' },
+        { src: currentTrack.thumb || '/icon-512.png', sizes: '512x512', type: 'image/jpeg' },
+      ];
+
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: currentTrack.title || 'Haytify Music',
+          artist: currentTrack.artist || 'Haytify',
+          album: currentTrack.album || 'Haytify Streaming',
+          artwork,
+        });
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+  }, [currentTrack, isPlaying]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+
+    try {
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (!isPlaying) togglePlayPause();
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        if (isPlaying) togglePlayPause();
+      });
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        playPrev();
+      });
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        playNext();
+      });
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime !== undefined && details.seekTime !== null) {
+          seekTo(details.seekTime);
+        }
+      });
+      navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+        const skip = details.seekOffset || 10;
+        seekTo(Math.max(0, currentTime - skip));
+      });
+      navigator.mediaSession.setActionHandler('seekforward', (details) => {
+        const skip = details.seekOffset || 10;
+        seekTo(Math.min(duration || 0, currentTime + skip));
+      });
+      navigator.mediaSession.setActionHandler('stop', () => {
+        if (isPlaying) togglePlayPause();
+      });
+    } catch {
+      // ignore
+    }
+  }, [isPlaying, currentTime, duration, playNext, playPrev, seekTo, togglePlayPause]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
+
+    if ('setPositionState' in navigator.mediaSession && duration > 0) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: Math.max(0, duration),
+          playbackRate: 1,
+          position: Math.min(Math.max(0, currentTime), duration),
+        });
+      } catch {
+        // ignore
+      }
+    }
+  }, [currentTime, duration]);
+
   return (
     <AudioContext.Provider
       value={{
@@ -815,8 +1011,11 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         volume,
         queue,
         queueIndex: queueIndex >= 0 ? queueIndex : 0,
+        clearQueue,
+        removeFromQueue,
         history,
         smartRecommendations,
+        curatedPlaylists,
         userTasteProfile,
         isShuffle,
         repeatMode: repeatModeLabel,
@@ -824,7 +1023,6 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         playlists,
         followedArtists,
         recommendations,
-        isQueueSidebarOpen,
         isRecDrawerOpen,
         isNowPlayingModalOpen,
         isLyricsModalOpen,
@@ -857,7 +1055,18 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         openNowPlayingModal,
         closeNowPlayingModal,
         setNowPlayingModalOpen,
+        activeRightSidebar,
+        isNowPlayingSidebarOpen,
+        isQueueSidebarOpen,
+        isLyricsSidebarOpen,
+        isLyricsFullscreen,
+        toggleNowPlayingSidebar,
         toggleQueueSidebar,
+        toggleLyricsSidebar,
+        setIsLyricsSidebarOpen,
+        setIsLyricsFullscreen,
+        openFullscreenLyrics,
+        closeFullscreenLyrics,
         toggleRecDrawer,
         toggleLyricsModal,
         setIsLyricsModalOpen,

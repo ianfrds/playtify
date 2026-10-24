@@ -4,6 +4,7 @@ import React from 'react';
 import { Track } from '@/types';
 import { useAudio } from '@/context/AudioContext';
 import { useRouter } from 'next/navigation';
+import { sanitizeTrack, DEFAULT_FALLBACK_COVER } from '@/lib/trackSanitizer';
 
 interface TrackRowProps {
   track: Track;
@@ -14,18 +15,14 @@ interface TrackRowProps {
   onRemove?: () => void;
 }
 
-export function TrackRow({ track, index, playCount, onPlay, queueContext, onRemove }: TrackRowProps) {
+export function TrackRow({ track: rawTrack, index, playCount, onPlay, queueContext, onRemove }: TrackRowProps) {
+  const track = sanitizeTrack(rawTrack);
   const { currentTrack, isPlaying, playTrack, toggleLike, isLiked } = useAudio();
   const router = useRouter();
 
   const isCurrent = currentTrack?.id === track.id;
   const isThisPlaying = isCurrent && isPlaying;
-  const thumbUrl =
-    track.thumb ||
-    track.thumbnail ||
-    (track.id && !track.id.startsWith('http')
-      ? `https://i.ytimg.com/vi/${track.id}/hqdefault.jpg`
-      : 'https://i.ytimg.com/vi/WKZO-CWeOVA/hqdefault.jpg');
+  const thumbUrl = track.thumb || track.thumbnail || DEFAULT_FALLBACK_COVER;
 
   const handlePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -95,12 +92,7 @@ export function TrackRow({ track, index, playCount, onPlay, queueContext, onRemo
             alt={track.title}
             loading="lazy"
             onError={(e) => {
-              const target = e.currentTarget;
-              if (track.id && !target.src.includes(track.id)) {
-                target.src = `https://i.ytimg.com/vi/${track.id}/hqdefault.jpg`;
-              } else {
-                target.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=120&h=120&fit=crop';
-              }
+              (e.currentTarget as HTMLImageElement).src = '/logo.png';
             }}
           />
         </div>

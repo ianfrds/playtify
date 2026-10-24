@@ -41,7 +41,7 @@ export default function LikedSongsPage() {
       </div>
 
       {likedTracks.length > 0 ? (
-        <div className="track-table-wrap" style={{ padding: '0 32px 32px' }}>
+        <div className="track-table-wrap">
           <div className="track-table-header">
             <div className="col-index">#</div>
             <div className="col-title">Judul</div>

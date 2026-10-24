@@ -47,7 +47,7 @@ export function AuthGate() {
         } else {
           setSuccessMsg(
             data?.session
-              ? 'Akun berhasil dibuat! Selamat datang di Playtify.'
+              ? 'Akun berhasil dibuat! Selamat datang di Haytify.'
               : 'Pendaftaran berhasil! Silakan periksa email kamu untuk konfirmasi akun atau langsung masuk.'
           );
           if (data?.session) {
@@ -70,17 +70,16 @@ export function AuthGate() {
         {/* Brand Header */}
         <div className="auth-brand-header">
           <div className="auth-brand-logo">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="#1ed760">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M8 11.5c3.5-1 7-0.5 9.5 1" stroke="#121212" strokeWidth="2" strokeLinecap="round" fill="none" />
-              <path d="M7.5 14.5c4-1 8-0.5 10.5 1" stroke="#121212" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-              <path d="M9 8.5c3-0.8 6-0.3 8.5 1" stroke="#121212" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-            </svg>
-            <span className="auth-brand-name">Playtify</span>
+            <img
+              src="/logo.png"
+              alt="Haytify"
+              style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'contain' }}
+            />
+            <span className="auth-brand-name">Haytify</span>
           </div>
 
           <h1 className="auth-title">
-            {mode === 'login' ? 'Masuk ke Playtify' : 'Daftar Akun Baru'}
+            {mode === 'login' ? 'Masuk ke Haytify' : 'Daftar Akun Baru'}
           </h1>
           <p className="auth-subtitle">
             {mode === 'login'
@@ -208,7 +207,7 @@ export function AuthGate() {
             {loading ? (
               <span className="auth-spinner" />
             ) : mode === 'login' ? (
-              'Masuk ke Playtify'
+              'Masuk ke Haytify'
             ) : (
               'Daftar Sekarang'
             )}

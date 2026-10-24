@@ -23,12 +23,34 @@ export const ARTIST_DATABASE: Record<string, Omit<ArtistProfile, 'tracks'>> = {
     related: ['Nadin Amizah', 'Sal Priadi', 'Hindia', 'Juicy Luicy', 'Mahalini', 'Tulus'],
     popularTracks: [
       {
+        id: 'HB8vftGxsIc',
+        title: 'Untungnya, Hidup Harus Tetap Berjalan',
+        artist: 'Bernadya',
+        duration: 184,
+        thumb: 'https://i.ytimg.com/vi/HB8vftGxsIc/hqdefault.jpg',
+        thumbnail: 'https://i.ytimg.com/vi/HB8vftGxsIc/hqdefault.jpg',
+        badge: 'POP INDONESIA',
+        artistId: 'bernadya',
+        album: 'Sialnya, Hidup Harus Tetap Berjalan',
+      },
+      {
         id: 'z-XHpftdXEE',
         title: 'Satu Bulan',
         artist: 'Bernadya',
         duration: 201,
         thumb: 'https://i.ytimg.com/vi/z-XHpftdXEE/hqdefault.jpg',
         thumbnail: 'https://i.ytimg.com/vi/z-XHpftdXEE/hqdefault.jpg',
+        badge: 'POP INDONESIA',
+        artistId: 'bernadya',
+        album: 'Sialnya, Hidup Harus Tetap Berjalan',
+      },
+      {
+        id: '9hjMIOIysng',
+        title: 'Kini Mereka Tahu',
+        artist: 'Bernadya',
+        duration: 219,
+        thumb: 'https://i.ytimg.com/vi/9hjMIOIysng/hqdefault.jpg',
+        thumbnail: 'https://i.ytimg.com/vi/9hjMIOIysng/hqdefault.jpg',
         badge: 'POP INDONESIA',
         artistId: 'bernadya',
         album: 'Sialnya, Hidup Harus Tetap Berjalan',
@@ -589,17 +611,55 @@ export const ARTIST_DATABASE: Record<string, Omit<ArtistProfile, 'tracks'>> = {
   },
 };
 
+// Helper to get real avatar for an artist without dummy fallback
+export function getArtistAvatar(artistName: string): string {
+  if (!artistName) return '/logo.png';
+  const clean = artistName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+
+  for (const [key, val] of Object.entries(ARTIST_DATABASE)) {
+    if (
+      key === clean ||
+      val.name.toLowerCase() === artistName.toLowerCase() ||
+      clean.includes(key) ||
+      key.includes(clean)
+    ) {
+      if (val.avatar) return val.avatar;
+      if (val.banner) return val.banner;
+    }
+  }
+
+  const trackMatch = ALL_RECOMMENDATIONS_POOL.find(
+    (t) =>
+      t.artist.toLowerCase().includes(artistName.toLowerCase()) ||
+      artistName.toLowerCase().includes(t.artist.toLowerCase())
+  );
+  if (trackMatch?.thumb) return trackMatch.thumb;
+
+  return '/logo.png';
+}
+
 export function getArtistData(nameOrId: string, optionalTrack?: Track | null): ArtistProfile {
-  if (!nameOrId) nameOrId = 'bernadya';
-  const clean = nameOrId.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  // If nameOrId is a YouTube channel ID (e.g. UC...), prioritize human artist name
+  const isChannelId = (s?: string) =>
+    !!s && (/^UC[a-zA-Z0-9_-]{18,}$/.test(s) || (s.startsWith('UC') && s.length >= 20));
+
+  let effectiveName = nameOrId || '';
+  if ((!effectiveName || isChannelId(effectiveName)) && optionalTrack?.artist && !isChannelId(optionalTrack.artist)) {
+    effectiveName = optionalTrack.artist;
+  }
+  if (!effectiveName || isChannelId(effectiveName)) {
+    effectiveName = optionalTrack?.artist || 'Artis';
+  }
+
+  const clean = effectiveName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 
   // Look up by direct key, slug, or matching name
   let dbEntry: Omit<ArtistProfile, 'tracks'> | undefined;
   for (const [key, val] of Object.entries(ARTIST_DATABASE)) {
     if (
       key === clean ||
-      key.replace(/-/g, ' ') === nameOrId.toLowerCase() ||
-      val.name.toLowerCase() === nameOrId.toLowerCase() ||
+      key.replace(/-/g, ' ') === effectiveName.toLowerCase() ||
+      val.name.toLowerCase() === effectiveName.toLowerCase() ||
       clean.includes(key) ||
       key.includes(clean)
     ) {
@@ -610,7 +670,7 @@ export function getArtistData(nameOrId: string, optionalTrack?: Track | null): A
 
   // Find all truly matching tracks across the pool
   const pool = ALL_RECOMMENDATIONS_POOL;
-  const searchKey = dbEntry ? dbEntry.name.toLowerCase() : nameOrId.toLowerCase().replace(/-/g, ' ');
+  const searchKey = dbEntry ? dbEntry.name.toLowerCase() : effectiveName.toLowerCase().replace(/-/g, ' ');
 
   const matchingTracks: Track[] = [];
   const seenIds = new Set<string>();
@@ -659,8 +719,8 @@ export function getArtistData(nameOrId: string, optionalTrack?: Track | null): A
 
   // Procedural fallback for artists not in the database
   let hash = 0;
-  for (let i = 0; i < nameOrId.length; i++) {
-    hash = (hash << 5) - hash + nameOrId.charCodeAt(i);
+  for (let i = 0; i < effectiveName.length; i++) {
+    hash = (hash << 5) - hash + effectiveName.charCodeAt(i);
     hash |= 0;
   }
   const seed = Math.abs(hash);
@@ -670,7 +730,14 @@ export function getArtistData(nameOrId: string, optionalTrack?: Track | null): A
   const listenersFormatted = `${millions}.${thousands}.${hundreds}`;
   const rankNum = (seed % 80) + 10;
   const followersFormatted = `${(seed % 15) + 1}.${seed % 9}M`;
-  const displayName = nameOrId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+  let displayName = effectiveName;
+  if (isChannelId(displayName) && optionalTrack?.artist && !isChannelId(optionalTrack.artist)) {
+    displayName = optionalTrack.artist;
+  }
+  if (displayName.includes('-') && !displayName.includes(' ')) {
+    displayName = displayName.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
 
   // Use optionalTrack if available
   if (optionalTrack && !seenIds.has(optionalTrack.id)) {
@@ -693,7 +760,7 @@ export function getArtistData(nameOrId: string, optionalTrack?: Track | null): A
     avatar: defaultBanner,
     bio: `${displayName} adalah musisi dengan karya lagu yang telah didengarkan jutaan kali di berbagai platform musik digital. Menghadirkan warna musik khas dengan aransemen orisinal.`,
     writer: displayName,
-    producer: 'Playtify Music Production',
+    producer: 'Haytify Music Production',
     albums: [
       { id: 'col1', title: `${displayName} (The Collection)`, year: '2024', type: 'Album', thumb: defaultBanner, cover: defaultBanner },
       { id: 'col2', title: 'Live Session & Akustik', year: '2023', type: 'EP', thumb: defaultBanner, cover: defaultBanner },

@@ -1,11 +1,14 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAudio } from '@/context/AudioContext';
 import { getArtistData } from '@/data/artists';
+import { getLyricsForTrack } from '@/data/lyrics';
 import TrackRow from '@/components/tracks/TrackRow';
 import SpotifyLyrics from '@/components/lyrics/SpotifyLyrics';
+
+const DEFAULT_COVER = '/logo.png';
 
 export default function WebNowPlayingPage() {
   const router = useRouter();
@@ -21,12 +24,52 @@ export default function WebNowPlayingPage() {
     seekTo,
     isShuffle,
     toggleShuffle,
+    repeatMode,
+    toggleRepeat,
     isLiked,
     toggleLike,
     queue,
     queueIndex,
+    openFullscreenLyrics,
     toggleLyricsModal,
+    showToast,
   } = useAudio();
+
+  const [showMenu, setShowMenu] = useState(false);
+  const [lyricsData, setLyricsData] = useState<any>(null);
+
+  // Fetch real-time synced lyrics for the preview card
+  useEffect(() => {
+    if (!currentTrack) return;
+    const staticL = getLyricsForTrack(currentTrack.id, currentTrack.title, currentTrack.artist);
+    setLyricsData(staticL);
+
+    let cancelled = false;
+    const fetchLive = async () => {
+      try {
+        const query = new URLSearchParams({
+          title: currentTrack.title,
+          artist: currentTrack.artist,
+          id: currentTrack.id,
+          duration: (currentTrack.duration || 210).toString(),
+        });
+        const res = await fetch(`/api/lyrics?${query.toString()}`);
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          if (data && data.lines && data.lines.length > 0) {
+            setLyricsData(data);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+    fetchLive();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentTrack]);
 
   if (!currentTrack) {
     return (
@@ -63,9 +106,18 @@ export default function WebNowPlayingPage() {
 
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
   const liked = isLiked(currentTrack.id);
-  const artistData = getArtistData(currentTrack.artistId || currentTrack.artist.toLowerCase(), currentTrack);
-  const upcomingQueue = queue.slice(queueIndex + 1, queueIndex + 5);
-  const thumbUrl = currentTrack.thumbnail || currentTrack.thumb || '';
+  const artistLookup = currentTrack.artist && !currentTrack.artist.startsWith('UC')
+    ? currentTrack.artist
+    : currentTrack.artistId || 'bernadya';
+  const artistData = getArtistData(artistLookup, currentTrack);
+  const upcomingQueue = queue.slice(queueIndex + 1, queueIndex + 6);
+  const thumbUrl = currentTrack.thumbnail || currentTrack.thumb || DEFAULT_COVER;
+
+  // Active line for preview card
+  const activeLineIdx = (lyricsData?.lines || []).reduce((acc: number, line: any, idx: number) => {
+    return line.time <= currentTime ? idx : acc;
+  }, 0);
+  const previewLines = (lyricsData?.lines || []).slice(activeLineIdx, activeLineIdx + 3);
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!duration || !progressBarRef.current) return;
@@ -75,95 +127,222 @@ export default function WebNowPlayingPage() {
   };
 
   const handleArtistClick = () => {
-    const artistId = currentTrack.artistId || encodeURIComponent(currentTrack.artist.toLowerCase().trim().replace(/[^a-z0-9]/g, '-'));
-    router.push(`/artist/${artistId}`);
+    const slug = encodeURIComponent(
+      (currentTrack.artist || 'artis').toLowerCase().trim().replace(/[^a-z0-9]/g, '-')
+    );
+    router.push(`/artist/${slug}`);
   };
+
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (typeof window !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(window.location.href);
+      showToast('Tautan lagu disalin ke papan klip!');
+    }
+  };
+
+  const contextTitle = currentTrack.album || currentTrack.badge || 'Popular Songs';
 
   return (
     <section id="view-now-playing" className="view active now-playing-web-view" style={{ display: 'block' }}>
-      {/* ─── Navigation Bar ─── */}
-      <div className="view-nav-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      {/* ─── Ambient Backdrop Glow ─── */}
+      <div
+        className="now-playing-ambient-backdrop"
+        style={{ backgroundImage: `url(${thumbUrl})` }}
+        aria-hidden="true"
+      />
+
+      {/* ─── Top Spotify-Style Header (Matches Screenshot) ─── */}
+      <div className="now-playing-page-topbar">
         <button
-          className="btn-back-pill"
+          className="now-playing-topbar-btn"
           onClick={() => router.back()}
           title="Kembali"
           aria-label="Kembali"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 16px',
-            borderRadius: 9999,
-            background: 'rgba(255,255,255,0.1)',
-            border: 'none',
-            color: '#fff',
-            cursor: 'pointer',
-            fontSize: '0.85rem',
-            fontWeight: 700,
-          }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <polyline points="15 18 9 12 15 6" />
           </svg>
-          <span>Kembali</span>
         </button>
 
-        <span
-          className="view-tag-badge"
-          style={{
-            background: 'rgba(30, 215, 96, 0.15)',
-            color: 'var(--accent)',
-            fontSize: '0.72rem',
-            fontWeight: 800,
-            padding: '4px 12px',
-            borderRadius: 9999,
-            letterSpacing: '0.08em',
-          }}
-        >
-          SEDANG DIPUTAR
-        </span>
+        <div className="now-playing-context-center" title={`${currentTrack.artist} – ${contextTitle}`}>
+          <span className="now-playing-context-title">
+            {currentTrack.artist} – {contextTitle}
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* Menu Dropdown ••• */}
+          <div style={{ position: 'relative' }}>
+            <button
+              className="now-playing-topbar-btn"
+              onClick={() => setShowMenu(!showMenu)}
+              title="Lainnya"
+              aria-label="Menu opsi lainnya"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="5" cy="12" r="2" />
+                <circle cx="12" cy="12" r="2" />
+                <circle cx="19" cy="12" r="2" />
+              </svg>
+            </button>
+
+            {showMenu && (
+              <div
+                className="now-playing-popover-menu"
+                style={{ top: '100%', right: 0 }}
+                onClick={() => setShowMenu(false)}
+              >
+                <button onClick={handleShare}>
+                  <span>Bagikan Lagu</span>
+                </button>
+                <button onClick={handleArtistClick}>
+                  <span>Buka Profil Artis</span>
+                </button>
+                <button onClick={() => router.push('/queue')}>
+                  <span>Buka Antrean Lagu</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Fullscreen Expand ⤢ */}
+          <button
+            className="now-playing-topbar-btn"
+            onClick={() => openFullscreenLyrics()}
+            title="Layar Penuh Lirik"
+            aria-label="Layar Penuh Lirik"
+          >
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+              <polyline points="15 3 21 3 21 9" />
+              <polyline points="9 21 3 21 3 15" />
+              <line x1="21" y1="3" x2="14" y2="10" />
+              <line x1="3" y1="21" x2="10" y2="14" />
+            </svg>
+          </button>
+
+          {/* Queue Button */}
+          <button
+            className="now-playing-topbar-btn"
+            onClick={() => router.push('/queue')}
+            title="Buka Antrean Lagu"
+            aria-label="Buka Antrean Lagu"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="8" y1="6" x2="21" y2="6" />
+              <line x1="8" y1="12" x2="21" y2="12" />
+              <line x1="8" y1="18" x2="21" y2="18" />
+              <circle cx="3.5" cy="6" r="1.5" />
+              <circle cx="3.5" cy="12" r="1.5" />
+              <circle cx="3.5" cy="18" r="1.5" />
+            </svg>
+            {queue.length > 0 && <span className="now-playing-queue-dot" />}
+          </button>
+        </div>
       </div>
 
+      {/* ─── Main Content Layout ─── */}
       <div className="now-playing-web-layout">
-        {/* ─── Left Hero: Glowing Spinning Vinyl & Meta & Controls ─── */}
-        <div className="now-playing-web-left">
-          <div className="now-playing-web-disc-section">
-            <div className="now-playing-disc-glow" />
-            <div className={`now-playing-disc-wrap ${isPlaying ? 'spinning' : ''}`}>
-              <img src={thumbUrl} alt={currentTrack.title} loading="lazy" />
+        {/* ─── Left Hero Column: Artwork, Titles, Actions, Scrubber, Controls ─── */}
+        <div className="now-playing-hero-card">
+          {/* Square Artwork */}
+          <div className="now-playing-artwork-stage">
+            <div
+              className="now-playing-artwork-glow"
+              style={{ backgroundImage: `url(${thumbUrl})` }}
+              aria-hidden="true"
+            />
+            <div className="now-playing-artwork-box">
+              <img
+                src={thumbUrl}
+                alt={currentTrack.title}
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = DEFAULT_COVER;
+                }}
+              />
             </div>
           </div>
 
-          <div className="now-playing-web-meta">
-            <h1 id="web-np-title" className="now-playing-web-title">
-              {currentTrack.title}
-            </h1>
-            <div className="now-playing-web-artist-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 4 }}>
+          {/* Track Title, Artist, Share [↑] & Like/Add (+) Row (Matches Screenshot) */}
+          <div className="now-playing-meta-row">
+            <div className="now-playing-meta-info">
+              <h1 id="web-np-title" className="now-playing-hero-title">
+                {currentTrack.title}
+              </h1>
+              <div className="now-playing-artist-wrapper">
+                <button
+                  id="web-np-artist"
+                  className="now-playing-artist-link"
+                  onClick={handleArtistClick}
+                  title="Lihat Profil Artis"
+                >
+                  <span>{currentTrack.artist}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Right Action Icons: Share [↑] and Add/Like (+) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
               <button
-                id="web-np-artist"
-                className="now-playing-web-artist-btn"
-                onClick={handleArtistClick}
-                title="Lihat Profil Artis"
-                aria-label="Lihat Profil Artis"
+                className="now-playing-action-icon-btn"
+                onClick={handleShare}
+                title="Bagikan"
+                aria-label="Bagikan lagu"
               >
-                <span>{currentTrack.artist}</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="#3d91f4">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                  <polyline points="16 6 12 2 8 6" />
+                  <line x1="12" y1="2" x2="12" y2="15" />
                 </svg>
               </button>
-              <span className="now-playing-album-tag" style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-                • Audio Resmi YouTube
-              </span>
+
+              <button
+                className={`now-playing-action-icon-btn ${liked ? 'is-liked' : ''}`}
+                onClick={() => toggleLike(currentTrack)}
+                title={liked ? 'Hapus dari Disukai' : 'Simpan ke Disukai'}
+                aria-label={liked ? 'Hapus dari Disukai' : 'Simpan ke Disukai'}
+              >
+                {liked ? (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="#1ed760">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                  </svg>
+                ) : (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="16" />
+                    <line x1="8" y1="12" x2="16" y2="12" />
+                  </svg>
+                )}
+              </button>
             </div>
           </div>
 
-          {/* Interactive Controls */}
-          <div className="now-playing-web-controls">
+          {/* Interactive Progress Scrubber */}
+          <div className="now-playing-scrubber-section">
+            <div
+              className="now-playing-progress-track"
+              ref={progressBarRef}
+              onClick={handleSeek}
+              role="slider"
+              aria-label="Posisi pemutaran musik"
+              tabIndex={0}
+            >
+              <div className="now-playing-progress-filled" style={{ width: `${progressPct}%` }} />
+              <div className="now-playing-progress-thumb" style={{ left: `${progressPct}%` }} />
+            </div>
+            <div className="now-playing-time-row">
+              <span className="time-stamp">{formatTime(currentTime)}</span>
+              <span className="time-stamp">{formatTime(duration)}</span>
+            </div>
+          </div>
+
+          {/* Playback Controls Row */}
+          <div className="now-playing-controls-row">
             <button
-              className={`icon-btn control-btn ${isShuffle ? 'active' : ''}`}
+              className={`np-ctrl-btn ${isShuffle ? 'active' : ''}`}
               onClick={toggleShuffle}
-              title="Acak"
-              aria-label="Acak"
+              title="Acak Lagu"
+              aria-label="Acak Lagu"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="16,3 21,3 21,8" />
@@ -175,142 +354,138 @@ export default function WebNowPlayingPage() {
             </button>
 
             <button
-              className="icon-btn control-btn"
+              className="np-ctrl-btn np-prev-btn"
               onClick={playPrev}
-              title="Sebelumnya"
-              aria-label="Lagu sebelumnya"
+              title="Lagu Sebelumnya"
+              aria-label="Lagu Sebelumnya"
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
               </svg>
             </button>
 
             <button
-              className="web-np-play-btn"
+              className="np-main-play-btn"
               onClick={togglePlay}
               title={isPlaying ? 'Jeda' : 'Putar'}
               aria-label={isPlaying ? 'Jeda' : 'Putar'}
             >
               {isPlaying ? (
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M6 4h4v16H6zM14 4h4v16h-4z" />
                 </svg>
               ) : (
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: 3 }}>
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" style={{ marginLeft: 3 }}>
                   <path d="M8 5v14l11-7z" />
                 </svg>
               )}
             </button>
 
             <button
-              className="icon-btn control-btn"
+              className="np-ctrl-btn np-next-btn"
               onClick={playNext}
-              title="Selanjutnya"
-              aria-label="Lagu selanjutnya"
+              title="Lagu Berikutnya"
+              aria-label="Lagu Berikutnya"
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M16 6h2v12h-2zm-10 0l8.5 6L6 18z" />
               </svg>
             </button>
 
             <button
-              className={`icon-btn player-like-btn ${liked ? 'liked' : ''}`}
-              onClick={() => toggleLike(currentTrack)}
-              title={liked ? 'Hapus dari Disukai' : 'Suka lagu ini'}
-              aria-label="Suka lagu ini"
+              className={`np-ctrl-btn ${repeatMode !== 'off' ? 'active' : ''}`}
+              onClick={toggleRepeat}
+              title={`Ulangi (${repeatMode})`}
+              aria-label={`Ulangi (${repeatMode})`}
             >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill={liked ? 'var(--accent)' : 'none'}
-                stroke={liked ? 'var(--accent)' : 'currentColor'}
-                strokeWidth="2"
-              >
-                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="17 1 21 5 17 9" />
+                <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                <polyline points="7 23 3 19 7 15" />
+                <path d="M21 13v2a4 4 0 0 1-4 4H3" />
               </svg>
+              {repeatMode === 'one' && <span className="np-repeat-one-badge">1</span>}
             </button>
           </div>
 
-          {/* Progress Scrubber */}
-          <div className="now-playing-web-progress-wrap">
-            <div
-              className="modal-progress-bar"
-              ref={progressBarRef}
-              onClick={handleSeek}
-              role="slider"
-              aria-label="Posisi lagu"
-              tabIndex={0}
-            >
-              <div className="modal-progress-fill" style={{ width: `${progressPct}%` }} />
-              <div className="modal-progress-handle" style={{ left: `${progressPct}%` }} />
-            </div>
-            <div className="modal-time-labels">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
-            </div>
-          </div>
-
+          {/* Pratinjau lirik Card (Especially on mobile, or when scrolling down) */}
           <div
-            className="now-playing-audio-badge"
+            className="now-playing-sidebar-lyrics-card"
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              fontSize: '0.72rem',
-              color: 'var(--text-muted)',
+              background: lyricsData?.themeColor || '#4a1118',
               marginTop: 18,
-              letterSpacing: '0.06em',
             }}
+            onClick={() => openFullscreenLyrics()}
+            role="button"
+            tabIndex={0}
+            title="Klik untuk membuka lirik layar penuh"
           >
-            <span
-              style={{
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: 'var(--accent)',
-                display: 'inline-block',
-                boxShadow: '0 0 8px var(--accent)',
-              }}
-            />
-            <span>HQ AUDIO • 320 KBPS • YOUTUBE STREAMING</span>
+            <div className="lyrics-card-top">
+              <span className="lyrics-card-badge">Pratinjau lirik</span>
+              <span className="lyrics-card-expand-hint">Buka lirik &gt;</span>
+            </div>
+
+            <div className="lyrics-card-lines">
+              {previewLines.length > 0 ? (
+                previewLines.map((l: any, i: number) => (
+                  <p
+                    key={i}
+                    className={`lyrics-card-line ${i === 0 ? 'active' : i === 1 ? 'next-1' : 'next-2'}`}
+                  >
+                    {l.text}
+                  </p>
+                ))
+              ) : (
+                <>
+                  <p className="lyrics-card-line active">♪ {currentTrack.title} ♪</p>
+                  <p className="lyrics-card-line next-1">{currentTrack.artist}</p>
+                  <p className="lyrics-card-line next-2">Memuat lirik...</p>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* ─── Right Companion: Lyrics, Artist Card, Up Next Queue ─── */}
-        <div className="now-playing-web-right">
-          {/* Card 1: Spotify Realtime Lyrics */}
-          <SpotifyLyrics
-            track={currentTrack}
-            currentTime={currentTime}
-            duration={duration}
-            onSeek={seekTo}
-            mode="embedded"
-            onExpand={() => toggleLyricsModal(true)}
-          />
+        {/* ─── Right Column: Real-time Synced Karaoke & Artist Info (Desktop) ─── */}
+        <div className="now-playing-side-column">
+          {/* Card 1: Spotify Realtime Synced Lyrics */}
+          <div className="now-playing-lyrics-container">
+            <SpotifyLyrics
+              track={currentTrack}
+              currentTime={currentTime}
+              duration={duration}
+              onSeek={seekTo}
+              mode="embedded"
+              onExpand={() => openFullscreenLyrics()}
+            />
+          </div>
 
           {/* Card 2: Tentang Artis Card */}
           <div
-            className="now-playing-web-card artist-card"
+            className="now-playing-side-card artist-card"
             onClick={handleArtistClick}
-            style={{ cursor: 'pointer' }}
+            role="button"
+            tabIndex={0}
           >
-            <div className="card-header-badge">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <div className="side-card-badge">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
               <span>TENTANG ARTIS</span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div className="artist-preview-row">
               <img
                 src={artistData.avatar}
                 alt={artistData.name}
-                style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover' }}
+                className="artist-preview-avatar"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = DEFAULT_COVER;
+                }}
               />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h4 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fff' }}>{artistData.name}</h4>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              <div className="artist-preview-info">
+                <h4 className="artist-preview-name">{artistData.name}</h4>
+                <p className="artist-preview-listeners">
                   {artistData.monthlyListeners} pendengar bulanan
                 </p>
               </div>
@@ -320,12 +495,12 @@ export default function WebNowPlayingPage() {
             </div>
           </div>
 
-          {/* Card 3: Antrian Selanjutnya */}
+          {/* Card 3: Berikutnya dalam Antrean */}
           {upcomingQueue.length > 0 && (
-            <div className="now-playing-web-card queue-card">
-              <div className="card-header-between">
-                <div className="card-header-badge" style={{ marginBottom: 0 }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <div className="now-playing-side-card queue-card">
+              <div className="side-card-header-row">
+                <div className="side-card-badge">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="8" y1="6" x2="21" y2="6" />
                     <line x1="8" y1="12" x2="21" y2="12" />
                     <line x1="8" y1="18" x2="21" y2="18" />
@@ -333,13 +508,20 @@ export default function WebNowPlayingPage() {
                     <circle cx="3.5" cy="12" r="1.5" />
                     <circle cx="3.5" cy="18" r="1.5" />
                   </svg>
-                  <span>ANTRIAN SELANJUTNYA</span>
+                  <span>BERIKUTNYA DALAM ANTREAN</span>
                 </div>
+                <button
+                  className="side-card-link-btn"
+                  onClick={() => router.push('/queue')}
+                  title="Lihat semua antrean"
+                >
+                  Buka Antrean
+                </button>
               </div>
-              <div className="track-list" style={{ marginTop: 12 }}>
+              <div className="now-playing-queue-list">
                 {upcomingQueue.map((track, idx) => (
                   <TrackRow
-                    key={track.id}
+                    key={`${track.id}-${idx}`}
                     track={track}
                     index={idx}
                     queueContext={queue}

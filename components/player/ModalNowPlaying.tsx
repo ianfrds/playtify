@@ -3,8 +3,9 @@
 import React, { useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAudio } from '@/context/AudioContext';
-
 import SpotifyLyrics from '@/components/lyrics/SpotifyLyrics';
+
+const DEFAULT_COVER = '/logo.png';
 
 export default function ModalNowPlaying() {
   const router = useRouter();
@@ -40,7 +41,7 @@ export default function ModalNowPlaying() {
 
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
   const liked = isLiked(currentTrack.id);
-  const thumbUrl = currentTrack.thumbnail || currentTrack.thumb || '';
+  const thumbUrl = currentTrack.thumbnail || currentTrack.thumb || DEFAULT_COVER;
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!duration || !progressBarRef.current) return;
@@ -63,6 +64,13 @@ export default function ModalNowPlaying() {
       role="dialog"
       aria-label="Layar Sekarang Diputar"
     >
+      {/* ─── Ambient Backdrop Glow ─── */}
+      <div
+        className="now-playing-modal-ambient"
+        style={{ backgroundImage: `url(${thumbUrl})` }}
+        aria-hidden="true"
+      />
+
       {/* 1. Top Bar */}
       <div className="now-playing-topbar">
         <button
@@ -76,53 +84,84 @@ export default function ModalNowPlaying() {
           </svg>
         </button>
 
-        <span className="now-playing-topbar-title">MEMUTAR MUSIK</span>
+        <div className="now-playing-modal-header-text">
+          <span className="now-playing-modal-subtitle">MEMUTAR DARI PLAYLIST</span>
+          <span className="now-playing-modal-title-text">{currentTrack.album || currentTrack.badge || 'Haytify Music'}</span>
+        </div>
 
         <div className="now-playing-topbar-actions">
           <button
             className="icon-circle-btn"
-            onClick={handleArtistClick}
-            title="Lihat Profil Artis"
-            aria-label="Profil Artis"
+            onClick={() => {
+              setNowPlayingModalOpen(false);
+              router.push('/queue');
+            }}
+            title="Antrean Lagu"
+            aria-label="Antrean Lagu"
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="8" y1="6" x2="21" y2="6" />
+              <line x1="8" y1="12" x2="21" y2="12" />
+              <line x1="8" y1="18" x2="21" y2="18" />
+              <circle cx="3.5" cy="6" r="1.5" />
+              <circle cx="3.5" cy="12" r="1.5" />
+              <circle cx="3.5" cy="18" r="1.5" />
             </svg>
           </button>
         </div>
       </div>
 
-      {/* 2. Disc Artwork */}
-      <div className="now-playing-disc-section">
-        <div className="now-playing-disc-glow" />
-        <div className={`now-playing-disc-wrap ${isPlaying ? 'spinning' : ''}`}>
-          <img src={thumbUrl} alt={currentTrack.title} />
+      {/* 2. Modern Square Album Artwork (No spinning vinyl) */}
+      <div className="now-playing-artwork-stage">
+        <div
+          className="now-playing-artwork-glow"
+          style={{ backgroundImage: `url(${thumbUrl})` }}
+          aria-hidden="true"
+        />
+        <div className="now-playing-artwork-box">
+          <img
+            src={thumbUrl}
+            alt={currentTrack.title}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).src = DEFAULT_COVER;
+            }}
+          />
         </div>
       </div>
 
-      {/* 3. Title & Artist Meta */}
-      <div className="now-playing-meta">
-        <h2 className="now-playing-title">{currentTrack.title}</h2>
-        <p
-          className="now-playing-artist clickable-artist"
-          onClick={handleArtistClick}
-          style={{ cursor: 'pointer' }}
+      {/* 3. Title & Artist Meta Row with Heart/Like */}
+      <div className="now-playing-meta-row">
+        <div className="now-playing-meta-info">
+          <h2 className="now-playing-title">{currentTrack.title}</h2>
+          <p
+            className="now-playing-artist clickable-artist"
+            onClick={handleArtistClick}
+            style={{ cursor: 'pointer' }}
+          >
+            {currentTrack.artist}
+          </p>
+        </div>
+
+        <button
+          className={`now-playing-heart-btn ${liked ? 'liked' : ''}`}
+          onClick={() => toggleLike(currentTrack)}
+          title={liked ? 'Hapus dari Disukai' : 'Suka'}
+          aria-label="Suka"
         >
-          {currentTrack.artist}
-        </p>
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill={liked ? 'var(--accent)' : 'none'}
+            stroke={liked ? 'var(--accent)' : 'currentColor'}
+            strokeWidth="2.2"
+          >
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+        </button>
       </div>
 
-      {/* 4. Spotify Synced Lyrics Preview Card */}
-      <SpotifyLyrics
-        track={currentTrack}
-        currentTime={currentTime}
-        duration={duration}
-        onSeek={seekTo}
-        mode="preview"
-        onExpand={() => toggleLyricsModal(true)}
-      />
-
-      {/* 5. Progress Scrubber */}
+      {/* 4. Progress Scrubber */}
       <div className="now-playing-progress-wrap">
         <div
           className="modal-progress-bar"
@@ -141,7 +180,7 @@ export default function ModalNowPlaying() {
         </div>
       </div>
 
-      {/* 6. Controls Bar */}
+      {/* 5. Controls Bar */}
       <div className="now-playing-controls">
         <button
           className={`modal-ctrl-btn ${isShuffle ? 'active' : ''}`}
@@ -199,25 +238,35 @@ export default function ModalNowPlaying() {
         </button>
 
         <button
-          className="modal-ctrl-btn"
-          onClick={() => toggleLike(currentTrack)}
-          title={liked ? 'Hapus dari Disukai' : 'Suka'}
-          aria-label="Suka"
-          style={{ color: liked ? 'var(--accent)' : 'inherit' }}
+          className={`modal-ctrl-btn ${repeatMode !== 'off' ? 'active' : ''}`}
+          onClick={toggleRepeat}
+          title={`Ulangi (${repeatMode})`}
+          aria-label={`Ulangi (${repeatMode})`}
+          style={{ color: repeatMode !== 'off' ? 'var(--accent)' : 'inherit', position: 'relative' }}
         >
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill={liked ? 'var(--accent)' : 'none'}
-            stroke={liked ? 'var(--accent)' : 'currentColor'}
-            strokeWidth="2"
-          >
-            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="17 1 21 5 17 9" />
+            <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+            <polyline points="7 23 3 19 7 15" />
+            <path d="M21 13v2a4 4 0 0 1-4 4H3" />
           </svg>
+          {repeatMode === 'one' && (
+            <span style={{ position: 'absolute', top: -2, right: -2, fontSize: '0.62rem', fontWeight: 800 }}>1</span>
+          )}
         </button>
+      </div>
+
+      {/* 6. Spotify Synced Lyrics Preview Card */}
+      <div style={{ marginTop: 16 }}>
+        <SpotifyLyrics
+          track={currentTrack}
+          currentTime={currentTime}
+          duration={duration}
+          onSeek={seekTo}
+          mode="preview"
+          onExpand={() => toggleLyricsModal(true)}
+        />
       </div>
     </div>
   );
 }
-

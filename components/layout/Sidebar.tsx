@@ -68,135 +68,14 @@ export function Sidebar() {
   return (
     <aside id="sidebar" className="sidebar" aria-label="Navigasi Utama">
       <div className="sidebar-header">
-        <div className="brand" id="brand-display">
-          <svg className="brand-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="12" cy="12" r="11" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M9.5 7.5V16.5L17 12L9.5 7.5Z" fill="currentColor" />
-          </svg>
-          <span className="brand-name" id="brand-name">Playtify</span>
+        <div className="brand" id="brand-display" onClick={() => router.push('/')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <img
+            src="/logo.png"
+            alt="Haytify"
+            style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'contain' }}
+          />
+          <span className="brand-name" id="brand-name">Haytify</span>
         </div>
-      </div>
-
-      {/* User Auth Profile Pill / Login CTA */}
-      <div style={{ padding: '0 12px 14px 12px' }}>
-        {user ? (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '8px 12px',
-              borderRadius: 10,
-              background: 'rgba(255, 255, 255, 0.05)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-            }}
-          >
-            <div
-              onClick={() => router.push('/login')}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1, cursor: 'pointer' }}
-              title="Lihat Akun"
-            >
-              {user.user_metadata?.avatar_url || user.user_metadata?.picture ? (
-                <img
-                  src={user.user_metadata.avatar_url || user.user_metadata.picture}
-                  alt=""
-                  style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '50%',
-                    background: '#1ed760',
-                    color: '#000',
-                    fontWeight: 800,
-                    fontSize: '0.82rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  {(user.user_metadata?.full_name || user.email || 'U').charAt(0).toUpperCase()}
-                </div>
-              )}
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div
-                  style={{
-                    fontSize: '0.8rem',
-                    fontWeight: 700,
-                    color: '#fff',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0]}
-                </div>
-                <div style={{ fontSize: '0.68rem', color: '#1ed760', fontWeight: 600 }}>Tersambung</div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => signOut()}
-              title="Keluar dari akun"
-              aria-label="Keluar dari akun"
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#888',
-                cursor: 'pointer',
-                padding: 4,
-                display: 'flex',
-                alignItems: 'center',
-                transition: 'color 0.15s',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#ff4d4d')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = '#888')}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
-              </svg>
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => openAuthModal('Masuk ke Playtify', 'Nikmati fitur lengkap, simpan lagu favorit, dan buat playlist pribadimu.')}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              padding: '9px 14px',
-              borderRadius: 24,
-              background: '#fff',
-              color: '#000',
-              fontWeight: 700,
-              fontSize: '0.84rem',
-              border: 'none',
-              cursor: 'pointer',
-              transition: 'transform 0.15s, background-color 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.02)';
-              e.currentTarget.style.backgroundColor = '#1ed760';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.backgroundColor = '#fff';
-            }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-            <span>Masuk / Daftar</span>
-          </button>
-        )}
       </div>
 
       <nav className="sidebar-nav">
@@ -328,6 +207,137 @@ export function Sidebar() {
             ))
           )}
         </ul>
+      </div>
+
+      {/* ─── Sidebar Bottom Footer (User Account / Login & Register) ─── */}
+      <div
+        className="sidebar-footer"
+        style={{
+          marginTop: 'auto',
+          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '14px 12px',
+          background: 'var(--bg-base)',
+          flexShrink: 0,
+        }}
+      >
+        {user ? (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '8px 12px',
+              borderRadius: 10,
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+            }}
+          >
+            <div
+              onClick={() => router.push('/login')}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1, cursor: 'pointer' }}
+              title="Lihat Akun"
+            >
+              {user.user_metadata?.avatar_url || user.user_metadata?.picture ? (
+                <img
+                  src={user.user_metadata.avatar_url || user.user_metadata.picture}
+                  alt=""
+                  style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '50%',
+                    background: '#1ed760',
+                    color: '#000',
+                    fontWeight: 800,
+                    fontSize: '0.82rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                  }}
+                >
+                  {(user.user_metadata?.full_name || user.email || 'U').charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div
+                  style={{
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    color: '#fff',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0]}
+                </div>
+                <div style={{ fontSize: '0.68rem', color: '#1ed760', fontWeight: 600 }}>Tersambung</div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => signOut()}
+              title="Keluar dari akun"
+              aria-label="Keluar dari akun"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#888',
+                cursor: 'pointer',
+                padding: 4,
+                display: 'flex',
+                alignItems: 'center',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#ff4d4d')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#888')}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => openAuthModal('Masuk ke Haytify', 'Nikmati fitur lengkap, simpan lagu favorit, dan buat playlist pribadimu.')}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: '10px 14px',
+              borderRadius: 24,
+              background: '#fff',
+              color: '#000',
+              fontWeight: 700,
+              fontSize: '0.84rem',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'transform 0.15s, background-color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.02)';
+              e.currentTarget.style.backgroundColor = '#1ed760';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.backgroundColor = '#fff';
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            <span>Masuk / Daftar</span>
+          </button>
+        )}
       </div>
     </aside>
   );

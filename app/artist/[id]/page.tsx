@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAudio } from '@/context/AudioContext';
-import { getArtistData } from '@/data/artists';
+import { getArtistData, getArtistAvatar } from '@/data/artists';
 import TrackRow from '@/components/tracks/TrackRow';
 
 export default function ArtistProfilePage() {
@@ -39,7 +39,7 @@ export default function ArtistProfilePage() {
 
   const artist = {
     ...baseArtist,
-    name: dynamicArtist?.name || baseArtist.name,
+    name: dynamicArtist?.name && !dynamicArtist.name.startsWith('UC') ? dynamicArtist.name : baseArtist.name,
     avatar: dynamicArtist?.avatar || baseArtist.avatar,
     banner: dynamicArtist?.avatar || baseArtist.banner,
     bio: dynamicArtist?.description || baseArtist.bio,
@@ -75,21 +75,8 @@ export default function ArtistProfilePage() {
           onClick={() => router.back()}
           title="Kembali"
           aria-label="Kembali"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 16px',
-            borderRadius: 9999,
-            background: 'rgba(255,255,255,0.1)',
-            border: 'none',
-            color: '#fff',
-            cursor: 'pointer',
-            fontSize: '0.85rem',
-            fontWeight: 700,
-          }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <polyline points="15 18 9 12 15 6" />
           </svg>
           <span>Kembali</span>
@@ -101,7 +88,7 @@ export default function ArtistProfilePage() {
       <div className="artist-hero" id="artist-hero-banner">
         <div
           className="artist-hero-bg"
-          style={{ backgroundImage: `url(${artist.coverImage || artist.banner})` }}
+          style={{ backgroundImage: `url(${artist.coverImage || artist.banner || artist.avatar || '/logo.png'})` }}
         />
         <div className="artist-hero-overlay" />
         <div className="artist-hero-content">
@@ -148,10 +135,10 @@ export default function ArtistProfilePage() {
       </div>
 
       {/* ─── Content Layout: Main column + Side column ─── */}
-      <div className="artist-content-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: 32, padding: '0 36px' }}>
+      <div className="artist-content-layout">
         <div className="artist-main-col">
           {/* Section: Populer */}
-          <div className="artist-section" style={{ marginBottom: 36 }}>
+          <div className="artist-section">
             <h2 className="artist-section-title">Populer</h2>
             <div className="track-table-list">
               {popularList.map((track, idx) => (
@@ -166,7 +153,7 @@ export default function ArtistProfilePage() {
           </div>
 
           {/* Section: Diskografi */}
-          <div className="artist-section" style={{ marginBottom: 36 }}>
+          <div className="artist-section">
             <div className="discography-header">
               <h2 className="artist-section-title">Diskografi</h2>
               <div className="discography-tabs">
@@ -191,19 +178,26 @@ export default function ArtistProfilePage() {
               </div>
             </div>
 
-            <div
-              className="shelf-grid"
-              style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 18 }}
-            >
-              {filteredAlbums.map((alb) => (
-                <div key={alb.id || alb.title} className="track-card">
-                  <div className="track-card-thumb" style={{ borderRadius: 8 }}>
-                    <img src={alb.cover || alb.thumb} alt={alb.title} loading="lazy" />
+            <div className="shelf-grid">
+              {filteredAlbums.map((alb) => {
+                const albCover = alb.cover || alb.thumb || artist.avatar || artist.banner || '/logo.png';
+                return (
+                  <div key={alb.id || alb.title} className="track-card">
+                    <div className="track-card-thumb">
+                      <img
+                        src={albCover}
+                        alt={alb.title}
+                        loading="lazy"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = artist.avatar || artist.banner || '/logo.png';
+                        }}
+                      />
+                    </div>
+                    <p className="track-card-title">{alb.title}</p>
+                    <p className="track-card-artist">{alb.year ? `${alb.year} • ` : ''}{alb.type || 'Album'}</p>
                   </div>
-                  <p className="track-card-title">{alb.title}</p>
-                  <p className="track-card-artist">{alb.year} • {alb.type}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -211,26 +205,32 @@ export default function ArtistProfilePage() {
           <div className="artist-section">
             <h2 className="artist-section-title">Penggemar Juga Menyukai</h2>
             <div className="artist-circles-grid">
-              {artist.related.map((relName) => (
-                <div
-                  key={relName}
-                  className="artist-circle-card"
-                  onClick={() => {
-                    const slug = relName.toLowerCase().replace(/[^a-z0-9]/g, '-');
-                    router.push(`/artist/${slug}`);
-                  }}
-                >
-                  <div className="artist-circle-avatar">
-                    <img
-                      src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=200&auto=format&fit=crop&q=80"
-                      alt={relName}
-                      loading="lazy"
-                    />
+              {artist.related.map((relName) => {
+                const relAvatar = getArtistAvatar(relName);
+                return (
+                  <div
+                    key={relName}
+                    className="artist-circle-card"
+                    onClick={() => {
+                      const slug = encodeURIComponent(relName.toLowerCase().trim().replace(/[^a-z0-9]/g, '-'));
+                      router.push(`/artist/${slug}`);
+                    }}
+                  >
+                    <div className="artist-circle-avatar">
+                      <img
+                        src={relAvatar}
+                        alt={relName}
+                        loading="lazy"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).src = '/logo.png';
+                        }}
+                      />
+                    </div>
+                    <span className="artist-circle-name">{relName}</span>
+                    <span className="artist-circle-role">Artis</span>
                   </div>
-                  <span className="artist-circle-name">{relName}</span>
-                  <span className="artist-circle-role">Artis</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

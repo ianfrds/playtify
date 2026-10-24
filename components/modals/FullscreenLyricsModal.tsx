@@ -15,10 +15,22 @@ export default function FullscreenLyricsModal() {
     playNext,
     playPrev,
     isLyricsModalOpen,
+    isLyricsFullscreen,
+    closeFullscreenLyrics,
     setIsLyricsModalOpen,
   } = useAudio();
 
-  if (!isLyricsModalOpen || !currentTrack) return null;
+  const [isMobile, setIsMobile] = React.useState(false);
+
+  React.useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  const shouldShow = currentTrack && (isLyricsFullscreen || (isLyricsModalOpen && isMobile));
+  if (!shouldShow) return null;
 
   return (
     <SpotifyLyrics
@@ -31,7 +43,10 @@ export default function FullscreenLyricsModal() {
       onNext={playNext}
       onPrev={playPrev}
       mode="fullscreen"
-      onClose={() => setIsLyricsModalOpen(false)}
+      onClose={() => {
+        closeFullscreenLyrics();
+        setIsLyricsModalOpen(false);
+      }}
     />
   );
 }

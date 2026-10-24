@@ -4,7 +4,7 @@ import { useAudio } from '@/context/AudioContext';
 import { useRouter } from 'next/navigation';
 
 export function QueueSidebar() {
-  const { isQueueSidebarOpen, toggleQueueSidebar, currentTrack, queue, playTrack } = useAudio();
+  const { isQueueSidebarOpen, toggleQueueSidebar, currentTrack, queue, playTrack, clearQueue } = useAudio();
   const router = useRouter();
 
   const handleArtistClick = (e: React.MouseEvent, artist: string) => {
@@ -31,15 +31,27 @@ export function QueueSidebar() {
             <circle cx="3.5" cy="12" r="1.5" />
             <circle cx="3.5" cy="18" r="1.5" />
           </svg>
-          <h3>Antrian Lagu</h3>
+          <h3>Antrean</h3>
           <span className="queue-sidebar-count">{queue.length} lagu</span>
         </div>
-        <button className="icon-btn small" onClick={() => toggleQueueSidebar(false)} title="Tutup">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {queue.length > 0 && (
+            <button
+              className="btn-text small"
+              onClick={clearQueue}
+              title="Kosongkan antrean"
+              style={{ fontSize: '0.74rem', color: 'var(--text-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}
+            >
+              Hapus
+            </button>
+          )}
+          <button className="icon-btn small" onClick={() => toggleQueueSidebar(false)} title="Tutup">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div className="queue-sidebar-body">
@@ -48,7 +60,13 @@ export function QueueSidebar() {
             <span className="sidebar-section-label">SEDANG DIPUTAR</span>
             <div className="sidebar-track-item current">
               <div className="sidebar-track-thumb">
-                <img src={currentTrack.thumb} alt={currentTrack.title} />
+                <img
+                  src={currentTrack.thumbnail || currentTrack.thumb || '/logo.png'}
+                  alt={currentTrack.title}
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = '/logo.png';
+                  }}
+                />
               </div>
               <div className="sidebar-track-meta">
                 <p className="sidebar-track-title">{currentTrack.title}</p>
@@ -74,7 +92,13 @@ export function QueueSidebar() {
                   style={{ cursor: 'pointer' }}
                 >
                   <div className="sidebar-track-thumb">
-                    <img src={track.thumb} alt={track.title} />
+                    <img
+                      src={track.thumbnail || track.thumb || '/logo.png'}
+                      alt={track.title}
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = '/logo.png';
+                      }}
+                    />
                   </div>
                   <div className="sidebar-track-meta">
                     <p className="sidebar-track-title">{track.title}</p>

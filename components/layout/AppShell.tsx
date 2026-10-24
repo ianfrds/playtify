@@ -9,8 +9,9 @@ import Sidebar from '@/components/layout/Sidebar';
 import PlayerBar from '@/components/player/PlayerBar';
 import MobileMiniPlayer from '@/components/player/MobileMiniPlayer';
 import BottomDock from '@/components/layout/BottomDock';
-import ModalNowPlaying from '@/components/player/ModalNowPlaying';
+import NowPlayingSidebar from '@/components/drawers/NowPlayingSidebar';
 import QueueSidebar from '@/components/drawers/QueueSidebar';
+import LyricsSidebar from '@/components/drawers/LyricsSidebar';
 import RecDrawer from '@/components/drawers/RecDrawer';
 import NewPlaylistModal from '@/components/modals/NewPlaylistModal';
 import EditPlaylistModal from '@/components/modals/EditPlaylistModal';
@@ -19,20 +20,35 @@ import FullscreenLyricsModal from '@/components/modals/FullscreenLyricsModal';
 import Toast from '@/components/common/Toast';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { user, isGuest, isAuthLoading } = useAudio();
+  const {
+    user,
+    isGuest,
+    isAuthLoading,
+    isQueueSidebarOpen,
+    isLyricsSidebarOpen,
+    isNowPlayingSidebarOpen,
+  } = useAudio();
 
   // 1. Loading splash screen while checking session & guest state
   if (isAuthLoading) {
     return (
       <div className="auth-splash-loader">
         <div className="auth-splash-content">
-          <svg className="auth-splash-icon" width="60" height="60" viewBox="0 0 24 24" fill="#1ed760">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M8 11.5c3.5-1 7-0.5 9.5 1" stroke="#121212" strokeWidth="2" strokeLinecap="round" fill="none" />
-            <path d="M7.5 14.5c4-1 8-0.5 10.5 1" stroke="#121212" strokeWidth="1.8" strokeLinecap="round" fill="none" />
-            <path d="M9 8.5c3-0.8 6-0.3 8.5 1" stroke="#121212" strokeWidth="2.2" strokeLinecap="round" fill="none" />
-          </svg>
-          <span className="auth-splash-brand">Playtify</span>
+          <img
+            src="/logo.png"
+            alt="Haytify"
+            className="auth-splash-icon"
+            style={{
+              width: 96,
+              height: 96,
+              borderRadius: '50%',
+              objectFit: 'contain',
+              boxShadow: '0 12px 36px rgba(0, 0, 0, 0.6), 0 0 40px rgba(30, 215, 96, 0.35)',
+            }}
+          />
+          <span className="auth-splash-brand" style={{ letterSpacing: '0.04em', marginTop: 4 }}>
+            Haytify
+          </span>
           <div className="auth-splash-spinner" />
         </div>
       </div>
@@ -49,13 +65,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // 3. Complete Playtify App Shell (Logged-in user or Guest)
+  const hasRightSidebar = isQueueSidebarOpen || isLyricsSidebarOpen || isNowPlayingSidebarOpen;
+
+  // 3. Complete Haytify App Shell (Logged-in user or Guest)
   return (
     <>
       {/* Persistent Audio Engine */}
       <GlobalAudioPlayer />
 
-      <div id="app">
+      <div
+        id="app"
+        className={`${isNowPlayingSidebarOpen ? 'has-now-playing-sidebar' : ''} ${isQueueSidebarOpen ? 'has-queue-sidebar' : ''} ${isLyricsSidebarOpen ? 'has-lyrics-sidebar' : ''} ${hasRightSidebar ? 'has-right-sidebar' : ''}`.trim()}
+      >
         {/* Desktop Left Sidebar */}
         <Sidebar />
 
@@ -73,11 +94,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Mobile Bottom Dock */}
         <BottomDock />
 
-        {/* Mobile Screen 3 Fullscreen Now Playing Modal */}
-        <ModalNowPlaying />
-
         {/* Flyout Drawers & Modals */}
+        <NowPlayingSidebar />
         <QueueSidebar />
+        <LyricsSidebar />
         <RecDrawer />
         <NewPlaylistModal />
         <EditPlaylistModal />
