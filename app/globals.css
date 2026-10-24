@@ -5252,19 +5252,27 @@ img { display: block; max-width: 100%; }
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
 }
 
-.auth-password-wrap {
+.auth-password-wrap,
+.auth-password-wrapper {
   position: relative;
   display: flex;
   align-items: center;
+  width: 100%;
 }
 
-.auth-password-wrap input {
-  padding-right: 42px;
+.auth-password-wrap input,
+.auth-password-wrapper input {
+  width: 100%;
+  padding-right: 46px !important;
+  box-sizing: border-box;
 }
 
-.auth-password-toggle {
+.auth-password-toggle,
+.auth-eye-btn {
   position: absolute;
-  right: 12px;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
   background: transparent;
   border: none;
   color: #888;
@@ -5272,12 +5280,25 @@ img { display: block; max-width: 100%; }
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
-  transition: color 0.15s;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 6px;
+  transition: color 0.15s, background-color 0.15s;
+  z-index: 5;
 }
 
-.auth-password-toggle:hover {
+.auth-password-toggle:hover,
+.auth-eye-btn:hover {
   color: #fff;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.auth-password-toggle svg,
+.auth-eye-btn svg {
+  display: block;
+  width: 18px;
+  height: 18px;
 }
 
 .btn-auth-primary {
@@ -5526,14 +5547,16 @@ img { display: block; max-width: 100%; }
 
 /* ===== Auth Modal (In-App) ===== */
 .auth-modal-card {
-  background: #181818;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 32px 28px;
-  width: 100%;
-  max-width: 420px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85);
   position: relative;
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 32px 28px;
+  width: 90%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.9);
   animation: modalSlideUp 0.25s cubic-bezier(0.2, 0, 0, 1);
   z-index: 10001;
 }

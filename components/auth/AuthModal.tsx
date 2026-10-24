@@ -70,7 +70,8 @@ export function AuthModal() {
   };
 
   return (
-    <div className="modal-backdrop" onClick={closeAuthModal}>
+    <div className="modal" style={{ display: 'flex', zIndex: 10000 }}>
+      <div className="modal-overlay" onClick={closeAuthModal} />
       <div
         className="auth-modal-card"
         onClick={(e) => e.stopPropagation()}

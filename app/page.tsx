@@ -11,6 +11,9 @@ export default function HomePage() {
   const router = useRouter();
   const {
     recommendations,
+    smartRecommendations,
+    userTasteProfile,
+    history,
     refreshRecommendations,
     playTrack,
     currentTrack,
@@ -286,6 +289,108 @@ export default function HomePage() {
 
       {/* ─── Spotify Recommendation Shelves Container ─── */}
       <div className="recommendations-container" id="recommendations-container" style={{ marginTop: 32 }}>
+        {/* Shelf: Rekomendasi Pintar Berdasarkan Selera Musik User */}
+        <section className="shelf-section" id="shelf-smart-recommendations">
+          <div className="shelf-header">
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span
+                  style={{
+                    background: 'linear-gradient(135deg, #1ed760 0%, #1db954 100%)',
+                    color: '#000',
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.06em',
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  ✨ Rekomendasi Pintar
+                </span>
+                {userTasteProfile.topGenre && (
+                  <span
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      color: '#ddd',
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 4,
+                    }}
+                  >
+                    Genre: {userTasteProfile.topGenre}
+                  </span>
+                )}
+              </div>
+              <h2>Dibuat Khusus untuk Kamu</h2>
+              <p className="subtitle">{userTasteProfile.summary}</p>
+            </div>
+            <div className="shelf-nav-actions">
+              <button
+                className="btn-pill-play shelf-play-all"
+                onClick={() => {
+                  if (smartRecommendations.length > 0) {
+                    playTrack(smartRecommendations[0], smartRecommendations);
+                  }
+                }}
+                title="Putar semua rekomendasi pintar"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+                Putar Semua
+              </button>
+            </div>
+          </div>
+          <div className="shelf-row-wrap">
+            <div className="shelf-row" id="shelf-row-smart">
+              {smartRecommendations.map((track) => (
+                <TrackCard
+                  key={`smart-${track.id}`}
+                  track={track}
+                  queueContext={smartRecommendations}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Shelf: Baru Saja Diputar (Recently Played) */}
+        {history.length > 0 && (
+          <section className="shelf-section" id="shelf-recently-played">
+            <div className="shelf-header">
+              <div>
+                <h2>Baru Saja Diputar</h2>
+                <p className="subtitle">Lanjutkan mendengarkan lagu terakhir yang kamu nikmati</p>
+              </div>
+              <div className="shelf-nav-actions">
+                <button
+                  className="btn-pill-play shelf-play-all"
+                  onClick={() => playTrack(history[0], history)}
+                  title="Putar riwayat lagu"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  Putar Semua
+                </button>
+              </div>
+            </div>
+            <div className="shelf-row-wrap">
+              <div className="shelf-row" id="shelf-row-history">
+                {history.slice(0, 10).map((track) => (
+                  <TrackCard
+                    key={`hist-${track.id}`}
+                    track={track}
+                    queueContext={history}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Shelf: Rekomendasi Playlist Populer */}
         <section className="shelf-section" id="shelf-playlists">
           <div className="shelf-header">

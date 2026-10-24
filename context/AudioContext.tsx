@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import { Track, UserPlaylist } from '@/types';
 import { ALL_RECOMMENDATIONS_POOL, RECOMMENDATIONS_DATA } from '@/data/recommendations';
 import {
@@ -38,6 +38,14 @@ interface AudioContextType {
   volume: number;
   queue: Track[];
   queueIndex: number;
+  history: Track[];
+  smartRecommendations: Track[];
+  userTasteProfile: {
+    topGenre: string | null;
+    topArtist: string | null;
+    totalListened: number;
+    summary: string;
+  };
   isShuffle: boolean;
   repeatMode: string | number;
   likedTracks: Track[];
@@ -208,6 +216,9 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       const savedFollowed = localStorage.getItem('playtify_followed_artists');
       if (savedFollowed) setFollowedArtists(JSON.parse(savedFollowed));
 
+      const savedHistory = localStorage.getItem('playtify_playback_history');
+      if (savedHistory) setHistory(JSON.parse(savedHistory));
+
       const initialPool = RECOMMENDATIONS_DATA.top_indo || [];
       if (initialPool.length > 0) {
         setQueue(initialPool.slice(1));
@@ -310,9 +321,17 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   };
 
   const playTrack = (track: Track, newQueue?: Track[]) => {
-    if (currentTrack) {
-      setHistory((prev) => [currentTrack, ...prev.slice(0, 30)]);
+    if (track) {
+      setHistory((prev) => {
+        const filtered = prev.filter((t) => t.id !== track.id);
+        const updated = [track, ...filtered.slice(0, 49)];
+        try {
+          localStorage.setItem('playtify_playback_history', JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
     }
+
     setCurrentTrack(track);
     setIsPlaying(true);
     setCurrentTime(0);
@@ -330,6 +349,77 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       playerRef.current.playVideo();
     }
   };
+
+  // Algorithmic Smart Recommendations based on user history & genre
+  const { smartRecommendations, userTasteProfile } = useMemo(() => {
+    if (!history || history.length === 0) {
+      return {
+        smartRecommendations: ALL_RECOMMENDATIONS_POOL.slice(0, 10),
+        userTasteProfile: {
+          topGenre: null,
+          topArtist: null,
+          totalListened: 0,
+          summary: 'Dengarkan lagu favoritmu untuk mendapatkan rekomendasi yang dipersonalisasi.',
+        },
+      };
+    }
+
+    // Tally genre and artist preferences with recency weighting
+    const genreScore: Record<string, number> = {};
+    const artistScore: Record<string, number> = {};
+
+    history.forEach((track, index) => {
+      const recencyWeight = Math.max(1, 10 - Math.floor(index / 2));
+      if (track.badge) {
+        genreScore[track.badge] = (genreScore[track.badge] || 0) + recencyWeight;
+      }
+      if (track.artist) {
+        artistScore[track.artist] = (artistScore[track.artist] || 0) + recencyWeight * 1.5;
+      }
+    });
+
+    const sortedGenres = Object.entries(genreScore).sort((a, b) => b[1] - a[1]);
+    const sortedArtists = Object.entries(artistScore).sort((a, b) => b[1] - a[1]);
+
+    const topGenre = sortedGenres[0]?.[0] || 'Pop Indonesia';
+    const topArtist = sortedArtists[0]?.[0] || '';
+
+    const historyIds = new Set(history.map((t) => t.id));
+
+    // Score catalog tracks
+    const scoredTracks = ALL_RECOMMENDATIONS_POOL.map((track) => {
+      let score = 0;
+      if (track.badge && genreScore[track.badge]) {
+        score += genreScore[track.badge] * 2.5;
+      }
+      if (track.artist && artistScore[track.artist]) {
+        score += artistScore[track.artist] * 3.5;
+      }
+      // Give bonus to fresh tracks not yet in history
+      if (!historyIds.has(track.id)) {
+        score += 8;
+      }
+      return { track, score };
+    });
+
+    scoredTracks.sort((a, b) => b.score - a.score);
+    const recs = scoredTracks.slice(0, 10).map((s) => s.track);
+
+    let summary = `Karena kamu sering mendengarkan genre ${topGenre}`;
+    if (topArtist) {
+      summary += ` dan lagu dari ${topArtist}`;
+    }
+
+    return {
+      smartRecommendations: recs,
+      userTasteProfile: {
+        topGenre,
+        topArtist,
+        totalListened: history.length,
+        summary,
+      },
+    };
+  }, [history]);
 
   const togglePlayPause = () => {
     if (!currentTrack) {
@@ -725,6 +815,9 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         volume,
         queue,
         queueIndex: queueIndex >= 0 ? queueIndex : 0,
+        history,
+        smartRecommendations,
+        userTasteProfile,
         isShuffle,
         repeatMode: repeatModeLabel,
         likedTracks,
