@@ -503,6 +503,41 @@ img { display: block; max-width: 100%; }
   color: var(--accent);
 }
 
+@media (max-width: 768px) {
+  .quick-mix-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  .quick-mix-card {
+    height: 52px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .quick-mix-thumb {
+    width: 52px;
+    height: 52px;
+  }
+
+  .quick-mix-title {
+    padding: 0 8px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    line-height: 1.25;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .quick-mix-play {
+    display: none !important;
+  }
+}
+
 /* ===== Track List ===== */
 .track-list {
   display: flex;
