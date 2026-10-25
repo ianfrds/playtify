@@ -911,12 +911,21 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if (typeof window === 'undefined' || !('mediaSession' in navigator)) return;
 
     if (currentTrack) {
+      const getFullUrl = (url?: string) => {
+        if (!url) return `${window.location.origin}/logo.png`;
+        if (url.startsWith('http://') || url.startsWith('https://')) return url;
+        return `${window.location.origin}${url.startsWith('/') ? '' : '/'}${url}`;
+      };
+
+      const rawArt = currentTrack.thumbnail || currentTrack.thumb || '/icon-512.png';
+      const fullArt = getFullUrl(rawArt);
+
       const artwork = [
-        { src: currentTrack.thumb || '/icon-192.png', sizes: '96x96', type: 'image/jpeg' },
-        { src: currentTrack.thumb || '/icon-192.png', sizes: '128x128', type: 'image/jpeg' },
-        { src: currentTrack.thumb || '/icon-192.png', sizes: '192x192', type: 'image/jpeg' },
-        { src: currentTrack.thumb || '/icon-512.png', sizes: '256x256', type: 'image/jpeg' },
-        { src: currentTrack.thumb || '/icon-512.png', sizes: '512x512', type: 'image/jpeg' },
+        { src: fullArt, sizes: '96x96', type: 'image/png' },
+        { src: fullArt, sizes: '128x128', type: 'image/png' },
+        { src: fullArt, sizes: '192x192', type: 'image/png' },
+        { src: fullArt, sizes: '256x256', type: 'image/png' },
+        { src: fullArt, sizes: '512x512', type: 'image/png' },
       ];
 
       try {

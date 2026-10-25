@@ -10,15 +10,13 @@ declare global {
   }
 }
 
-// 1-second silent WAV loop to keep audio context & session active on mobile OS
-const SILENT_WAV_LOOP =
-  'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-
 export function GlobalAudioPlayer() {
-  const { isPlaying, onPlayerReady, onPlayerStateChange, onProgressUpdate } = useAudio();
-  const playerRef = useRef<any>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const silentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const { onPlayerReady, onPlayerStateChange, onProgressUpdate } = useAudio();
+  
+  const audioEngineRef = useRef<HTMLAudioElement | null>(null);
+  const ytPlayerRef = useRef<any>(null);
+  const activeEngineRef = useRef<'native' | 'yt'>('native');
+  const currentVideoIdRef = useRef<string | null>(null);
 
   // 1. Register Service Worker for PWA & Background Support
   useEffect(() => {
@@ -29,63 +27,101 @@ export function GlobalAudioPlayer() {
     }
   }, []);
 
-  // 2. Mobile Silent Audio Keeper: keep background audio session alive
-  useEffect(() => {
-    if (!silentAudioRef.current) return;
-
-    if (isPlaying) {
-      silentAudioRef.current.play().catch(() => {
-        // May fail if user hasn't interacted yet
-      });
-    } else {
-      silentAudioRef.current.pause();
+  // 2. Fallback to YouTube Iframe Player when direct streaming isn't available
+  const fallbackToYouTube = (videoId: string) => {
+    console.warn(`[AudioEngine] Falling back to YouTube Iframe player for track ${videoId}`);
+    activeEngineRef.current = 'yt';
+    if (audioEngineRef.current) {
+      audioEngineRef.current.pause();
+      audioEngineRef.current.removeAttribute('src');
+      audioEngineRef.current.load();
     }
-  }, [isPlaying]);
+    if (ytPlayerRef.current && typeof ytPlayerRef.current.loadVideoById === 'function') {
+      ytPlayerRef.current.loadVideoById({
+        videoId,
+        suggestedQuality: 'small',
+      });
+      ytPlayerRef.current.playVideo();
+    }
+  };
 
-  // 3. Handle mobile background / visibility change
+  // 3. Initialize Unified Player Engine and YouTube Iframe fallback
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        if (isPlaying) {
-          silentAudioRef.current?.play().catch(() => {});
-          // If mobile browser forced YouTube pause on tab hide, resume
-          setTimeout(() => {
-            if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
-              const state = playerRef.current.getPlayerState?.();
-              if (state === 2) {
-                playerRef.current.playVideo();
-              }
-            }
-          }, 150);
-        }
-      } else if (document.visibilityState === 'visible') {
-        if (isPlaying && playerRef.current && typeof playerRef.current.playVideo === 'function') {
-          const state = playerRef.current.getPlayerState?.();
-          if (state === 2) {
-            playerRef.current.playVideo();
+    // A. Create the unified player engine facade
+    const engine = {
+      loadVideoById: ({ videoId }: { videoId: string }) => {
+        currentVideoIdRef.current = videoId;
+        activeEngineRef.current = 'native';
+
+        if (audioEngineRef.current) {
+          const streamUrl = `/api/stream?id=${encodeURIComponent(videoId)}`;
+          audioEngineRef.current.src = streamUrl;
+          audioEngineRef.current.currentTime = 0;
+          
+          const playPromise = audioEngineRef.current.play();
+          if (playPromise !== undefined) {
+            playPromise.catch((err) => {
+              console.warn('[AudioEngine] Native play error, falling back to YouTube:', err);
+              fallbackToYouTube(videoId);
+            });
           }
         }
-      }
+      },
+      playVideo: () => {
+        if (activeEngineRef.current === 'native' && audioEngineRef.current) {
+          audioEngineRef.current.play().catch(() => {});
+        } else if (ytPlayerRef.current?.playVideo) {
+          ytPlayerRef.current.playVideo();
+        }
+      },
+      pauseVideo: () => {
+        if (activeEngineRef.current === 'native' && audioEngineRef.current) {
+          audioEngineRef.current.pause();
+        } else if (ytPlayerRef.current?.pauseVideo) {
+          ytPlayerRef.current.pauseVideo();
+        }
+      },
+      seekTo: (seconds: number) => {
+        if (activeEngineRef.current === 'native' && audioEngineRef.current) {
+          audioEngineRef.current.currentTime = seconds;
+        } else if (ytPlayerRef.current?.seekTo) {
+          ytPlayerRef.current.seekTo(seconds, true);
+        }
+      },
+      setVolume: (percent: number) => {
+        if (audioEngineRef.current) {
+          audioEngineRef.current.volume = Math.max(0, Math.min(1, percent / 100));
+        }
+        if (ytPlayerRef.current?.setVolume) {
+          ytPlayerRef.current.setVolume(percent);
+        }
+      },
+      getDuration: () => {
+        if (activeEngineRef.current === 'native' && audioEngineRef.current) {
+          return audioEngineRef.current.duration || 0;
+        }
+        return ytPlayerRef.current?.getDuration?.() || 0;
+      },
+      getCurrentTime: () => {
+        if (activeEngineRef.current === 'native' && audioEngineRef.current) {
+          return audioEngineRef.current.currentTime || 0;
+        }
+        return ytPlayerRef.current?.getCurrentTime?.() || 0;
+      },
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [isPlaying]);
+    onPlayerReady(engine);
 
-  // 4. Initialize YouTube Iframe Player
-  useEffect(() => {
-    // Check if script already loaded
+    // B. Initialize YouTube fallback iframe
     if (!window.YT) {
       const tag = document.createElement('script');
       tag.src = 'https://www.youtube.com/iframe_api';
       document.head.appendChild(tag);
     }
 
-    const initPlayer = () => {
+    const initYt = () => {
       if (window.YT && window.YT.Player) {
-        playerRef.current = new window.YT.Player('yt-player-engine', {
+        ytPlayerRef.current = new window.YT.Player('yt-player-engine', {
           height: '2',
           width: '2',
           playerVars: {
@@ -100,11 +136,11 @@ export function GlobalAudioPlayer() {
             rel: 0,
           },
           events: {
-            onReady: (event: any) => {
-              onPlayerReady(event.target);
-            },
             onStateChange: (event: any) => {
-              onPlayerStateChange(event.data);
+              // Only propagate YouTube events when YouTube is the active engine
+              if (activeEngineRef.current === 'yt') {
+                onPlayerStateChange(event.data);
+              }
             },
           },
         });
@@ -112,22 +148,22 @@ export function GlobalAudioPlayer() {
     };
 
     if (window.YT && window.YT.Player) {
-      initPlayer();
+      initYt();
     } else {
-      window.onYouTubeIframeAPIReady = initPlayer;
+      window.onYouTubeIframeAPIReady = initYt;
     }
 
-    // Interval updater for playback position
-    intervalRef.current = setInterval(() => {
-      if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
-        const curr = playerRef.current.getCurrentTime() || 0;
-        const dur = playerRef.current.getDuration() || 0;
+    // Interval updater for YouTube fallback playback position
+    const interval = setInterval(() => {
+      if (activeEngineRef.current === 'yt' && ytPlayerRef.current && typeof ytPlayerRef.current.getCurrentTime === 'function') {
+        const curr = ytPlayerRef.current.getCurrentTime() || 0;
+        const dur = ytPlayerRef.current.getDuration() || 0;
         onProgressUpdate(curr, dur);
       }
     }, 250);
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      clearInterval(interval);
     };
   }, []);
 
@@ -137,8 +173,8 @@ export function GlobalAudioPlayer() {
         position: 'fixed',
         bottom: 0,
         right: 0,
-        width: 2,
-        height: 2,
+        width: 1,
+        height: 1,
         opacity: 0.01,
         pointerEvents: 'none',
         zIndex: -1,
@@ -146,14 +182,55 @@ export function GlobalAudioPlayer() {
       }}
       aria-hidden="true"
     >
-      <div id="yt-player-engine"></div>
+      {/* 
+        Native HTML5 Audio element:
+        Plays direct /api/stream audio chunks. Allows true background playback
+        on mobile devices (iOS Safari, Android Chrome, PWA) without being killed
+        by the OS when the screen is locked or tab is hidden.
+      */}
       <audio
-        ref={silentAudioRef}
-        src={SILENT_WAV_LOOP}
-        loop
+        ref={audioEngineRef}
         preload="auto"
         playsInline
+        onPlay={() => {
+          if (activeEngineRef.current === 'native') {
+            onPlayerStateChange(1); // Playing
+          }
+        }}
+        onPause={() => {
+          if (activeEngineRef.current === 'native') {
+            onPlayerStateChange(2); // Paused
+          }
+        }}
+        onEnded={() => {
+          if (activeEngineRef.current === 'native') {
+            onPlayerStateChange(0); // Ended -> auto plays next track in queue!
+          }
+        }}
+        onTimeUpdate={() => {
+          if (activeEngineRef.current === 'native' && audioEngineRef.current) {
+            const curr = audioEngineRef.current.currentTime || 0;
+            const dur = audioEngineRef.current.duration || 0;
+            onProgressUpdate(curr, dur);
+          }
+        }}
+        onLoadedMetadata={() => {
+          if (activeEngineRef.current === 'native' && audioEngineRef.current) {
+            const dur = audioEngineRef.current.duration;
+            if (dur && !isNaN(dur) && isFinite(dur)) {
+              onProgressUpdate(audioEngineRef.current.currentTime || 0, dur);
+            }
+          }
+        }}
+        onError={() => {
+          if (currentVideoIdRef.current) {
+            fallbackToYouTube(currentVideoIdRef.current);
+          }
+        }}
       />
+
+      {/* Fallback YouTube iframe container */}
+      <div id="yt-player-engine" />
     </div>
   );
 }
