@@ -68,6 +68,9 @@ interface AudioContextType {
   isBrandModalOpen: boolean;
   isNewPlaylistModalOpen: boolean;
   openNewPlaylistModal: () => void;
+  deferredInstallPrompt: any;
+  isPwaInstalled: boolean;
+  triggerPwaInstall: () => Promise<boolean>;
   toastMessage: string | null;
 
   toggleNowPlayingSidebar: (force?: boolean) => void;
@@ -173,8 +176,55 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [editingPlaylist, setEditingPlaylist] = useState<UserPlaylist | null>(null);
   const [isDeletePlaylistModalOpen, setIsDeletePlaylistModalOpen] = useState<boolean>(false);
   const [deletingPlaylist, setDeletingPlaylist] = useState<UserPlaylist | null>(null);
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
+  const [isPwaInstalled, setIsPwaInstalled] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleBeforeInstall = (e: any) => {
+      e.preventDefault();
+      setDeferredInstallPrompt(e);
+    };
+
+    const handleAppInstalled = () => {
+      setIsPwaInstalled(true);
+      setDeferredInstallPrompt(null);
+      showToast('Haytify berhasil dipasang di perangkat Anda!');
+    };
+
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsPwaInstalled(true);
+    }
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+
+  const triggerPwaInstall = async (): Promise<boolean> => {
+    if (!deferredInstallPrompt) return false;
+    try {
+      deferredInstallPrompt.prompt();
+      const choice = await deferredInstallPrompt.userChoice;
+      if (choice && choice.outcome === 'accepted') {
+        setIsPwaInstalled(true);
+        setDeferredInstallPrompt(null);
+        showToast('Haytify berhasil dipasang!');
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+    return false;
+  };
 
   const playerRef = useRef<any>(null);
 
@@ -1081,6 +1131,9 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         setIsLyricsModalOpen,
         setIsBrandModalOpen,
         setIsNewPlaylistModalOpen,
+        deferredInstallPrompt,
+        isPwaInstalled,
+        triggerPwaInstall,
 
         isEditPlaylistModalOpen,
         setIsEditPlaylistModalOpen,

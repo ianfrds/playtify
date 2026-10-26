@@ -3013,6 +3013,411 @@ img { display: block; max-width: 100%; }
   background: var(--bg-hover);
 }
 
+/* ===== Settings Modal (Pengaturan & Download APK) ===== */
+.settings-modal-overlay-wrap {
+  z-index: 1000 !important;
+}
+
+.settings-modal-content {
+  max-width: 540px !important;
+  width: 92% !important;
+  max-height: 88vh;
+  padding: 0 !important;
+  display: flex;
+  flex-direction: column;
+  background: #181818 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 20px !important;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+}
+
+.settings-modal-header {
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.settings-header-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-header-title-wrap svg {
+  color: #1ed760;
+}
+
+.settings-header-title-wrap h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.settings-modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  flex: 1;
+}
+
+.settings-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+/* 1. Android APK Banner Card */
+.settings-apk-card {
+  background: linear-gradient(135deg, rgba(30, 215, 96, 0.12) 0%, rgba(20, 32, 24, 0.8) 100%);
+  border: 1px solid rgba(30, 215, 96, 0.35);
+  border-radius: 16px;
+  padding: 18px 20px;
+  position: relative;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.settings-apk-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.settings-apk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1ed760;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.apk-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1ed760;
+  box-shadow: 0 0 10px #1ed760;
+  animation: pulseGreen 1.8s infinite;
+}
+
+@keyframes pulseGreen {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.settings-apk-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(30, 215, 96, 0.2);
+  color: #1ed760;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  border: 1px solid rgba(30, 215, 96, 0.3);
+}
+
+.settings-apk-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 6px 0;
+}
+
+.settings-apk-desc {
+  font-size: 0.84rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 0 16px 0;
+}
+
+.settings-apk-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.settings-apk-btn-main {
+  flex: 1;
+  min-width: 160px;
+  background: #1ed760 !important;
+  color: #000000 !important;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 9999px;
+  cursor: pointer;
+  border: none;
+  font-size: 0.9rem;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.settings-apk-btn-main:hover {
+  transform: scale(1.02);
+  filter: brightness(1.08);
+}
+
+.settings-apk-btn-sub {
+  flex: 1;
+  min-width: 160px;
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 9999px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.settings-apk-btn-sub:hover {
+  transform: scale(1.02);
+  background: rgba(255, 255, 255, 0.16) !important;
+}
+
+.settings-apk-guide-toggle {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #1ed760;
+  cursor: pointer;
+  text-align: center;
+  margin-top: 14px;
+  transition: color 0.15s ease;
+}
+
+.settings-apk-guide-toggle:hover {
+  text-decoration: underline;
+}
+
+.settings-apk-guide-box {
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-top: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-guide-steps {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  padding-left: 18px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.guide-subnote {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: #ffffff;
+}
+
+/* 2. Settings Section & Controls */
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settings-section-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.settings-segmented-control {
+  display: flex;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+}
+
+.segment-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.segment-btn.active {
+  background: #ffffff;
+  color: #000000;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.settings-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-row-label {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-row-sub {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* Toggle Switch */
+.settings-toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.settings-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: rgba(255, 255, 255, 0.2);
+  transition: 0.3s;
+  border-radius: 34px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.settings-toggle input:checked + .toggle-slider {
+  background-color: #1ed760;
+}
+
+.settings-toggle input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+/* Info Box */
+.settings-info-box {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.settings-info-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+}
+
+.info-key {
+  color: var(--text-muted);
+}
+
+.info-val {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.settings-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.btn-primary.full-width {
+  width: 100%;
+  padding: 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border-radius: 9999px;
+  cursor: pointer;
+  background: #1ed760;
+  color: #000000;
+  border: none;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.btn-primary.full-width:hover {
+  transform: scale(1.02);
+  filter: brightness(1.08);
+}
+
+@media (max-width: 768px) {
+  .settings-modal-content {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 24px 24px 0 0 !important;
+    max-height: 90vh !important;
+  }
+}
+
 /* ===== Context Menu ===== */
 .context-menu {
   position: fixed;
@@ -7272,7 +7677,542 @@ img { display: block; max-width: 100%; }
   }
 }
 
+/* ================================================================
+   DEDICATED SETTINGS PAGE (/settings) - SPACIOUS & BREATHABLE
+   ================================================================ */
+.settings-page-view {
+  min-height: 100vh;
+  background: var(--bg-base);
+  padding: 0 0 160px 0;
+  display: block;
+}
 
+.settings-page-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: max(16px, calc(env(safe-area-inset-top, 0px) + 14px)) 20px 14px;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgba(18, 18, 18, 0.94);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
 
+.settings-topbar-left {
+  min-width: 90px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
 
+.settings-topbar-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+  transition: background 0.18s ease, transform 0.15s ease;
+  width: fit-content;
+}
+
+.settings-topbar-back-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  transform: translateX(-2px);
+}
+
+.settings-topbar-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.settings-page-title {
+  font-size: 1.18rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.settings-topbar-right {
+  min-width: 90px;
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.settings-page-container {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 24px 18px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* Base Card Style: Clean, Breathable, Elevated */
+.settings-clean-card {
+  background: #181818;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.2s ease;
+}
+
+.settings-clean-card:hover {
+  border-color: rgba(255, 255, 255, 0.13);
+}
+
+/* 1. Android APK Feature Card */
+.settings-apk-feature-card {
+  background: linear-gradient(135deg, rgba(30, 215, 96, 0.09) 0%, rgba(20, 26, 22, 0.95) 100%);
+  border: 1px solid rgba(30, 215, 96, 0.32);
+  position: relative;
+  overflow: hidden;
+}
+
+.settings-apk-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.settings-apk-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1ed760;
+  background: rgba(30, 215, 96, 0.14);
+  padding: 5px 12px;
+  border-radius: 9999px;
+  border: 1px solid rgba(30, 215, 96, 0.3);
+}
+
+.settings-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #1ed760;
+  box-shadow: 0 0 10px #1ed760;
+  animation: pulseGreen 1.8s infinite ease-in-out;
+}
+
+.settings-apk-platform-tag {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 4px 11px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-apk-main-title {
+  font-size: 1.28rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.01em;
+}
+
+.settings-apk-main-desc {
+  font-size: 0.88rem;
+  color: #b3b3b3;
+  line-height: 1.55;
+  margin: 0 0 20px 0;
+}
+
+.settings-apk-button-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.settings-btn-download-apk {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 13px 20px;
+  border-radius: 9999px;
+  background: #1ed760;
+  color: #000000;
+  font-weight: 800;
+  font-size: 0.92rem;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.18s ease, filter 0.18s ease;
+  box-shadow: 0 4px 16px rgba(30, 215, 96, 0.3);
+}
+
+.settings-btn-download-apk:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.settings-btn-download-apk:active {
+  transform: translateY(0);
+}
+
+.settings-btn-install-pwa {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 13px 20px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.92rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.settings-btn-install-pwa:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.settings-guide-toggle-btn {
+  background: transparent;
+  border: none;
+  color: #1ed760;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 8px 0 0 0;
+  text-align: left;
+  display: inline-block;
+  transition: opacity 0.15s ease;
+}
+
+.settings-guide-toggle-btn:hover {
+  text-decoration: underline;
+  opacity: 0.9;
+}
+
+.settings-apk-instructions-box {
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-top: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-instructions-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 0.84rem;
+  color: #c4c4c4;
+  line-height: 1.55;
+}
+
+.settings-note-highlight {
+  background: rgba(30, 215, 96, 0.08);
+  border-left: 3px solid #1ed760;
+  padding: 8px 12px;
+  border-radius: 0 8px 8px 0;
+  margin-top: 6px;
+  font-size: 0.82rem;
+  color: #ffffff;
+}
+
+/* 2. Audio Quality Section */
+.settings-section-header {
+  margin-bottom: 18px;
+}
+
+.settings-group-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 4px 0;
+}
+
+.settings-group-subtitle {
+  font-size: 0.82rem;
+  color: #888888;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.settings-quality-selector {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.settings-quality-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.settings-quality-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.settings-quality-btn.active {
+  background: rgba(30, 215, 96, 0.12);
+  border-color: #1ed760;
+  box-shadow: 0 0 16px rgba(30, 215, 96, 0.18);
+}
+
+.quality-btn-title {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.settings-quality-btn.active .quality-btn-title {
+  color: #1ed760;
+}
+
+.quality-btn-sub {
+  font-size: 0.74rem;
+  color: #888888;
+}
+
+/* 3. Playback Preferences */
+.settings-preference-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-preference-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.settings-preference-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.settings-preference-item:first-child {
+  padding-top: 0;
+}
+
+.settings-item-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-item-title {
+  font-size: 0.94rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.settings-item-desc {
+  font-size: 0.78rem;
+  color: #888888;
+  line-height: 1.4;
+}
+
+/* iOS-Style Modern Toggle Switch */
+.settings-switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.settings-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.settings-switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: rgba(255, 255, 255, 0.18);
+  transition: background-color 0.25s ease;
+  border-radius: 9999px;
+}
+
+.settings-switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+}
+
+.settings-switch input:checked + .settings-switch-slider {
+  background-color: #1ed760;
+}
+
+.settings-switch input:checked + .settings-switch-slider:before {
+  transform: translateX(22px);
+}
+
+/* 4. Storage & Cache */
+.settings-storage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.settings-btn-clear-cache {
+  padding: 9px 18px;
+  border-radius: 9999px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.settings-btn-clear-cache:hover {
+  background: rgba(255, 77, 77, 0.12);
+  border-color: #ff4d4d;
+  color: #ff4d4d;
+}
+
+/* 5. App & Account Info */
+.settings-info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.84rem;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.settings-info-row:last-child {
+  border-bottom: none;
+}
+
+.info-row-key {
+  color: #888888;
+}
+
+.info-row-value {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.settings-footer-note {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 0.74rem;
+  color: #555555;
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 768px) {
+  .settings-page-view {
+    padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + 140px) 0;
+  }
+
+  .settings-page-topbar {
+    padding: max(14px, calc(env(safe-area-inset-top, 0px) + 12px)) 16px 12px;
+  }
+
+  .settings-topbar-left {
+    min-width: 70px;
+  }
+
+  .settings-topbar-right {
+    min-width: 70px;
+  }
+
+  .settings-page-container {
+    padding: 16px 14px 40px;
+    gap: 16px;
+  }
+
+  .settings-clean-card {
+    padding: 18px 16px;
+    border-radius: 16px;
+  }
+
+  .settings-apk-button-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .settings-quality-selector {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .settings-quality-btn {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+  }
+
+  .settings-storage-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .settings-btn-clear-cache {
+    width: 100%;
+    text-align: center;
+    padding: 11px;
+  }
+}
 
