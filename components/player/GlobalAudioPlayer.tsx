@@ -11,17 +11,44 @@ declare global {
 }
 
 export function GlobalAudioPlayer() {
-  const { onPlayerReady, onPlayerStateChange, onProgressUpdate, isPlaying } = useAudio();
+  const { onPlayerReady, onPlayerStateChange, onProgressUpdate, isPlaying, currentTrack } = useAudio();
   
   const audioEngineRef = useRef<HTMLAudioElement | null>(null);
   const ytPlayerRef = useRef<any>(null);
-  const activeEngineRef = useRef<'native' | 'yt'>('native');
+  const activeEngineRef = useRef<'native' | 'yt' | 'android_native'>('native');
   const currentVideoIdRef = useRef<string | null>(null);
   const isPlayingRef = useRef(isPlaying);
+  const currentTrackRef = useRef(currentTrack);
 
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
+
+  useEffect(() => {
+    currentTrackRef.current = currentTrack;
+  }, [currentTrack]);
+
+  // Handle native Android progress and state callbacks
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    (window as any).handleNativeProgress = (curr: number, dur: number) => {
+      if (activeEngineRef.current === 'android_native') {
+        onProgressUpdate(curr, dur);
+      }
+    };
+
+    (window as any).handleNativeStateChange = (playing: boolean) => {
+      if (activeEngineRef.current === 'android_native') {
+        onPlayerStateChange(playing ? 1 : 2);
+      }
+    };
+
+    return () => {
+      delete (window as any).handleNativeProgress;
+      delete (window as any).handleNativeStateChange;
+    };
+  }, [onProgressUpdate, onPlayerStateChange]);
 
   // Keep background audio active when app goes to background / screen locks
   useEffect(() => {
@@ -31,6 +58,11 @@ export function GlobalAudioPlayer() {
           audioEngineRef.current.play().catch(() => {});
         } else if (activeEngineRef.current === 'yt' && ytPlayerRef.current?.playVideo) {
           ytPlayerRef.current.playVideo();
+        } else if (activeEngineRef.current === 'android_native') {
+          const bridge = (window as any).AndroidAudioBridge;
+          if (bridge?.resumeAudio) {
+            bridge.resumeAudio();
+          }
         }
       }
     };
@@ -76,6 +108,32 @@ export function GlobalAudioPlayer() {
     const engine = {
       loadVideoById: ({ videoId }: { videoId: string }) => {
         currentVideoIdRef.current = videoId;
+
+        const bridge = typeof window !== 'undefined' ? (window as any).AndroidAudioBridge : null;
+        if (bridge && typeof bridge.playTrack === 'function') {
+          activeEngineRef.current = 'android_native';
+
+          // Pause web audio and youtube iframe so no duplicate playback
+          if (audioEngineRef.current) {
+            audioEngineRef.current.pause();
+            audioEngineRef.current.removeAttribute('src');
+          }
+          if (ytPlayerRef.current?.pauseVideo) {
+            ytPlayerRef.current.pauseVideo();
+          }
+
+          const track = currentTrackRef.current;
+          const origin = window.location.origin;
+          const streamUrl = `${origin}/api/stream?id=${encodeURIComponent(videoId)}`;
+          const title = track?.title || 'Haytify Music';
+          const artist = track?.artist || 'Haytify';
+          const cover = track?.thumbnail || track?.thumb || '';
+
+          bridge.playTrack(videoId, title, artist, cover, streamUrl);
+          return;
+        }
+
+        // Web / iOS standard HTML5 audio engine
         activeEngineRef.current = 'native';
 
         if (audioEngineRef.current) {
@@ -93,21 +151,30 @@ export function GlobalAudioPlayer() {
         }
       },
       playVideo: () => {
-        if (activeEngineRef.current === 'native' && audioEngineRef.current) {
+        const bridge = typeof window !== 'undefined' ? (window as any).AndroidAudioBridge : null;
+        if (activeEngineRef.current === 'android_native' && bridge?.resumeAudio) {
+          bridge.resumeAudio();
+        } else if (activeEngineRef.current === 'native' && audioEngineRef.current) {
           audioEngineRef.current.play().catch(() => {});
         } else if (ytPlayerRef.current?.playVideo) {
           ytPlayerRef.current.playVideo();
         }
       },
       pauseVideo: () => {
-        if (activeEngineRef.current === 'native' && audioEngineRef.current) {
+        const bridge = typeof window !== 'undefined' ? (window as any).AndroidAudioBridge : null;
+        if (activeEngineRef.current === 'android_native' && bridge?.pauseAudio) {
+          bridge.pauseAudio();
+        } else if (activeEngineRef.current === 'native' && audioEngineRef.current) {
           audioEngineRef.current.pause();
         } else if (ytPlayerRef.current?.pauseVideo) {
           ytPlayerRef.current.pauseVideo();
         }
       },
       seekTo: (seconds: number) => {
-        if (activeEngineRef.current === 'native' && audioEngineRef.current) {
+        const bridge = typeof window !== 'undefined' ? (window as any).AndroidAudioBridge : null;
+        if (activeEngineRef.current === 'android_native' && bridge?.seekTo) {
+          bridge.seekTo(seconds);
+        } else if (activeEngineRef.current === 'native' && audioEngineRef.current) {
           audioEngineRef.current.currentTime = seconds;
         } else if (ytPlayerRef.current?.seekTo) {
           ytPlayerRef.current.seekTo(seconds, true);
@@ -162,10 +229,8 @@ export function GlobalAudioPlayer() {
           },
           events: {
             onStateChange: (event: any) => {
-              // Only propagate YouTube events when YouTube is the active engine
               if (activeEngineRef.current === 'yt') {
                 if (event.data === 2) {
-                  // If YouTube was paused while user wanted playback and app is minimized/hidden, auto-resume!
                   if (isPlayingRef.current && typeof document !== 'undefined' && document.hidden) {
                     ytPlayerRef.current?.playVideo();
                     return;
@@ -213,34 +278,27 @@ export function GlobalAudioPlayer() {
       }}
       aria-hidden="true"
     >
-      {/* 
-        Native HTML5 Audio element:
-        Plays direct /api/stream audio chunks. Allows true background playback
-        on mobile devices (iOS Safari, Android Chrome, PWA) without being killed
-        by the OS when the screen is locked or tab is hidden.
-      */}
       <audio
         ref={audioEngineRef}
         preload="auto"
         playsInline
         onPlay={() => {
           if (activeEngineRef.current === 'native') {
-            onPlayerStateChange(1); // Playing
+            onPlayerStateChange(1);
           }
         }}
         onPause={() => {
           if (activeEngineRef.current === 'native') {
             if (typeof document !== 'undefined' && document.hidden) {
-              // Chromium throttled/paused HTML5 audio in background -> auto resume
               audioEngineRef.current?.play().catch(() => {});
               return;
             }
-            onPlayerStateChange(2); // Paused
+            onPlayerStateChange(2);
           }
         }}
         onEnded={() => {
           if (activeEngineRef.current === 'native') {
-            onPlayerStateChange(0); // Ended -> auto plays next track in queue!
+            onPlayerStateChange(0);
           }
         }}
         onTimeUpdate={() => {
@@ -259,13 +317,12 @@ export function GlobalAudioPlayer() {
           }
         }}
         onError={() => {
-          if (currentVideoIdRef.current) {
+          if (activeEngineRef.current === 'native' && currentVideoIdRef.current) {
             fallbackToYouTube(currentVideoIdRef.current);
           }
         }}
       />
 
-      {/* Fallback YouTube iframe container */}
       <div id="yt-player-engine" />
     </div>
   );

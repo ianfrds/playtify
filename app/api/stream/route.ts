@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Readable } from 'stream';
 import { Ytdl, Client } from '@distube/ytdl-core';
 
-interface CachedFormat {
-  url: string;
-  mimeType: string;
-  contentLength: number;
-  expires: number;
-}
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-const formatCache = new Map<string, CachedFormat>();
 const ytCookie = process.env.YT_COOKIE?.trim();
+// Use Tv & VisionOS clients to avoid web decipher script blocks from YouTube datacenter IPs
 const yt = new Ytdl({
-  clients: [Client.Tv, Client.WebEmbedded, Client.Mweb, Client.VisionOS],
+  clients: [Client.Tv, Client.VisionOS],
   cookie: ytCookie || undefined,
 });
 
@@ -24,66 +21,42 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    let cached = formatCache.get(id);
-    const now = Date.now();
-
-    if (!cached || cached.expires < now) {
-      const info = await yt.getInfo(`https://www.youtube.com/watch?v=${id}`);
-      const audioFormats = info.formats.filter((f) => !f.hasVideo && f.hasAudio && f.url);
-      
-      // Prioritize itag 140 (audio/mp4 - AAC) for universal iOS & Android mobile compatibility
-      const chosen =
-        audioFormats.find((f) => f.itag === 140) ||
-        audioFormats.sort((a, b) => (b.audioBitrate || 0) - (a.audioBitrate || 0))[0];
-
-      if (!chosen || !chosen.url) {
-        return new NextResponse('Audio stream not available', { status: 404 });
-      }
-
-      cached = {
-        url: chosen.url,
-        mimeType: chosen.mimeType?.split(';')[0] || 'audio/mp4',
-        contentLength: parseInt(String(chosen.contentLength || '0'), 10),
-        expires: now + 45 * 60 * 1000, // 45 minutes cache
-      };
-      formatCache.set(id, cached);
-    }
-
     const rangeHeader = req.headers.get('range');
-    const targetHeaders: Record<string, string> = {
-      'User-Agent':
-        'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+    let start = 0;
+    const downloadOpts: any = {
+      filter: { hasAudio: true, hasVideo: false },
+      quality: 'highestaudio',
     };
+
     if (rangeHeader) {
-      targetHeaders['Range'] = rangeHeader;
+      const match = rangeHeader.match(/bytes=(\d+)-/);
+      if (match) {
+        start = parseInt(match[1], 10);
+        downloadOpts.range = { start };
+      }
     }
 
-    const upstreamRes = await fetch(cached.url, {
-      headers: targetHeaders,
-    });
+    const nodeStream = yt.download(`https://www.youtube.com/watch?v=${id}`, downloadOpts);
 
-    if (!upstreamRes.ok && upstreamRes.status !== 206) {
-      formatCache.delete(id);
-      return new NextResponse('Upstream stream error', { status: upstreamRes.status });
+    // Convert Node.js readable stream to Web standard ReadableStream
+    const webStream = Readable.toWeb(nodeStream);
+
+    const headers = new Headers();
+    headers.set('Content-Type', 'audio/mp4');
+    headers.set('Accept-Ranges', 'bytes');
+    headers.set('Cache-Control', 'public, max-age=3600');
+
+    if (rangeHeader && start > 0) {
+      headers.set('Content-Range', `bytes ${start}-/*`);
+      return new NextResponse(webStream as any, {
+        status: 206,
+        headers,
+      });
     }
 
-    const resHeaders = new Headers();
-    resHeaders.set('Content-Type', cached.mimeType);
-    resHeaders.set('Accept-Ranges', 'bytes');
-    resHeaders.set('Cache-Control', 'public, max-age=3600');
-
-    const contentRange = upstreamRes.headers.get('content-range');
-    if (contentRange) {
-      resHeaders.set('Content-Range', contentRange);
-    }
-    const contentLength = upstreamRes.headers.get('content-length');
-    if (contentLength) {
-      resHeaders.set('Content-Length', contentLength);
-    }
-
-    return new NextResponse(upstreamRes.body as any, {
-      status: upstreamRes.status === 206 ? 206 : 200,
-      headers: resHeaders,
+    return new NextResponse(webStream as any, {
+      status: 200,
+      headers,
     });
   } catch (err: any) {
     console.error('Stream route error for id', id, ':', err?.message || err);
@@ -96,3 +69,4 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+

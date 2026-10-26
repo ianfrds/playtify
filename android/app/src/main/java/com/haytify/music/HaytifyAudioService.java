@@ -5,16 +5,22 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.Icon;
+import android.media.AudioAttributes;
 import android.media.MediaMetadata;
+import android.media.MediaPlayer;
 import android.media.session.MediaSession;
 import android.media.session.PlaybackState;
 import android.os.Build;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
+import android.os.PowerManager;
 import androidx.annotation.Nullable;
 
 import java.io.InputStream;
@@ -29,19 +35,79 @@ public class HaytifyAudioService extends Service {
     public static final String ACTION_PREV = "com.haytify.music.ACTION_PREV";
     public static final String ACTION_TOGGLE = "com.haytify.music.ACTION_TOGGLE";
     public static final String ACTION_NEXT = "com.haytify.music.ACTION_NEXT";
+    public static final String ACTION_PLAY_STREAM = "com.haytify.music.ACTION_PLAY_STREAM";
+    public static final String ACTION_PAUSE = "com.haytify.music.ACTION_PAUSE";
+    public static final String ACTION_RESUME = "com.haytify.music.ACTION_RESUME";
+    public static final String ACTION_SEEK = "com.haytify.music.ACTION_SEEK";
 
     private String currentTitle = "Haytify Music";
     private String currentArtist = "Musik berputar di latar belakang";
     private String currentCoverUrl = null;
+    private String currentStreamUrl = null;
     private Bitmap currentCoverBitmap = null;
-    private boolean isPlaying = true;
+    private boolean isPlaying = false;
     private MediaSession mediaSession;
+    private MediaPlayer mediaPlayer;
+    private Handler progressHandler;
+    private Runnable progressRunnable;
+    private PowerManager.WakeLock wakeLock;
 
     @Override
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
         initMediaSession();
+        initMediaPlayer();
+        try {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Haytify::AudioServiceWakeLock");
+                wakeLock.setReferenceCounted(false);
+                wakeLock.acquire(12 * 60 * 60 * 1000L); // 12 hours wakeLock
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void initMediaPlayer() {
+        if (mediaPlayer == null) {
+            mediaPlayer = new MediaPlayer();
+            mediaPlayer.setWakeMode(getApplicationContext(), PowerManager.PARTIAL_WAKE_LOCK);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                mediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .build());
+            }
+
+            mediaPlayer.setOnPreparedListener(mp -> {
+                try {
+                    mp.start();
+                    isPlaying = true;
+                    updateNotification();
+                    MainActivity.dispatchPlaybackState(true);
+                    startProgressTracking();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+
+            mediaPlayer.setOnCompletionListener(mp -> {
+                isPlaying = false;
+                updateNotification();
+                MainActivity.dispatchPlaybackState(false);
+                stopProgressTracking();
+                MainActivity.dispatchMediaAction("next");
+            });
+
+            mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+                isPlaying = false;
+                updateNotification();
+                MainActivity.dispatchPlaybackState(false);
+                stopProgressTracking();
+                MainActivity.dispatchMediaAction("native_stream_error");
+                return true;
+            });
+        }
     }
 
     private void initMediaSession() {
@@ -50,16 +116,12 @@ public class HaytifyAudioService extends Service {
             mediaSession.setCallback(new MediaSession.Callback() {
                 @Override
                 public void onPlay() {
-                    isPlaying = true;
-                    updateNotification();
-                    MainActivity.dispatchMediaAction("toggle");
+                    resumePlayback();
                 }
 
                 @Override
                 public void onPause() {
-                    isPlaying = false;
-                    updateNotification();
-                    MainActivity.dispatchMediaAction("toggle");
+                    pausePlayback();
                 }
 
                 @Override
@@ -70,6 +132,11 @@ public class HaytifyAudioService extends Service {
                 @Override
                 public void onSkipToPrevious() {
                     MainActivity.dispatchMediaAction("prev");
+                }
+
+                @Override
+                public void onSeekTo(long pos) {
+                    seekTo((int) pos);
                 }
             });
             mediaSession.setActive(true);
@@ -85,16 +152,27 @@ public class HaytifyAudioService extends Service {
             if (ACTION_PREV.equals(action)) {
                 MainActivity.dispatchMediaAction("prev");
             } else if (ACTION_TOGGLE.equals(action)) {
-                isPlaying = !isPlaying;
-                updateNotification();
-                MainActivity.dispatchMediaAction("toggle");
+                togglePlayback();
             } else if (ACTION_NEXT.equals(action)) {
                 MainActivity.dispatchMediaAction("next");
+            } else if (ACTION_PAUSE.equals(action)) {
+                pausePlayback();
+            } else if (ACTION_RESUME.equals(action)) {
+                resumePlayback();
+            } else if (ACTION_SEEK.equals(action)) {
+                int pos = intent.getIntExtra("positionMsec", 0);
+                seekTo(pos);
+            } else if (ACTION_PLAY_STREAM.equals(action)) {
+                String streamUrl = intent.getStringExtra("streamUrl");
+                String title = intent.getStringExtra("title");
+                String artist = intent.getStringExtra("artist");
+                String coverUrl = intent.getStringExtra("coverUrl");
+                playStream(streamUrl, title, artist, coverUrl);
             } else if (ACTION_UPDATE.equals(action)) {
                 String title = intent.getStringExtra("title");
                 String artist = intent.getStringExtra("artist");
                 String coverUrl = intent.getStringExtra("coverUrl");
-                boolean playing = intent.getBooleanExtra("isPlaying", true);
+                boolean playing = intent.getBooleanExtra("isPlaying", isPlaying);
 
                 if (title != null && !title.trim().isEmpty()) {
                     currentTitle = title;
@@ -113,6 +191,107 @@ public class HaytifyAudioService extends Service {
 
         updateNotification();
         return START_STICKY;
+    }
+
+    private void playStream(String streamUrl, String title, String artist, String coverUrl) {
+        if (title != null && !title.trim().isEmpty()) currentTitle = title;
+        if (artist != null && !artist.trim().isEmpty()) currentArtist = artist;
+        if (coverUrl != null && !coverUrl.equals(currentCoverUrl)) {
+            currentCoverUrl = coverUrl;
+            loadCoverBitmap(coverUrl);
+        }
+
+        if (streamUrl == null || streamUrl.trim().isEmpty()) return;
+        currentStreamUrl = streamUrl;
+
+        try {
+            initMediaPlayer();
+            mediaPlayer.reset();
+            mediaPlayer.setDataSource(streamUrl);
+            mediaPlayer.prepareAsync();
+            isPlaying = true;
+            updateNotification();
+        } catch (Exception e) {
+            e.printStackTrace();
+            MainActivity.dispatchMediaAction("native_stream_error");
+        }
+    }
+
+    private void pausePlayback() {
+        if (mediaPlayer != null) {
+            try {
+                if (mediaPlayer.isPlaying()) {
+                    mediaPlayer.pause();
+                }
+            } catch (Exception ignored) {}
+        }
+        isPlaying = false;
+        updateNotification();
+        MainActivity.dispatchPlaybackState(false);
+        stopProgressTracking();
+    }
+
+    private void resumePlayback() {
+        if (mediaPlayer != null) {
+            try {
+                mediaPlayer.start();
+                isPlaying = true;
+                updateNotification();
+                MainActivity.dispatchPlaybackState(true);
+                startProgressTracking();
+                return;
+            } catch (Exception ignored) {}
+        }
+        isPlaying = true;
+        updateNotification();
+        MainActivity.dispatchPlaybackState(true);
+    }
+
+    private void togglePlayback() {
+        if (isPlaying) {
+            pausePlayback();
+        } else {
+            resumePlayback();
+        }
+    }
+
+    private void seekTo(int msec) {
+        if (mediaPlayer != null) {
+            try {
+                mediaPlayer.seekTo(msec);
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private void startProgressTracking() {
+        stopProgressTracking();
+        if (progressHandler == null) {
+            progressHandler = new Handler(Looper.getMainLooper());
+        }
+        progressRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (mediaPlayer != null && isPlaying) {
+                    try {
+                        int curr = mediaPlayer.getCurrentPosition() / 1000;
+                        int dur = mediaPlayer.getDuration() / 1000;
+                        if (dur > 0) {
+                            MainActivity.dispatchPlaybackProgress(curr, dur);
+                        }
+                    } catch (Exception ignored) {}
+                    if (progressHandler != null) {
+                        progressHandler.postDelayed(this, 1000);
+                    }
+                }
+            }
+        };
+        progressHandler.post(progressRunnable);
+    }
+
+    private void stopProgressTracking() {
+        if (progressHandler != null && progressRunnable != null) {
+            progressHandler.removeCallbacks(progressRunnable);
+        }
     }
 
     private void loadCoverBitmap(String urlStr) {
@@ -161,18 +340,27 @@ public class HaytifyAudioService extends Service {
             try {
                 long actions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE |
                         PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS |
-                        PlaybackState.ACTION_PLAY_PAUSE;
+                        PlaybackState.ACTION_PLAY_PAUSE | PlaybackState.ACTION_SEEK_TO;
 
                 PlaybackState.Builder stateBuilder = new PlaybackState.Builder()
                         .setActions(actions)
                         .setState(isPlaying ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED,
-                                PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1.0f);
+                                mediaPlayer != null ? mediaPlayer.getCurrentPosition() : PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1.0f);
                 mediaSession.setPlaybackState(stateBuilder.build());
 
                 MediaMetadata.Builder metaBuilder = new MediaMetadata.Builder()
                         .putString(MediaMetadata.METADATA_KEY_TITLE, currentTitle)
                         .putString(MediaMetadata.METADATA_KEY_ARTIST, currentArtist)
                         .putString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST, currentArtist);
+
+                if (mediaPlayer != null) {
+                    try {
+                        long durationMs = mediaPlayer.getDuration();
+                        if (durationMs > 0) {
+                            metaBuilder.putLong(MediaMetadata.METADATA_KEY_DURATION, durationMs);
+                        }
+                    } catch (Exception ignored) {}
+                }
 
                 if (currentCoverBitmap != null) {
                     metaBuilder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, currentCoverBitmap);
@@ -254,6 +442,21 @@ public class HaytifyAudioService extends Service {
 
     @Override
     public void onDestroy() {
+        stopProgressTracking();
+        if (wakeLock != null && wakeLock.isHeld()) {
+            try {
+                wakeLock.release();
+            } catch (Exception ignored) {}
+        }
+        if (mediaPlayer != null) {
+            try {
+                if (mediaPlayer.isPlaying()) {
+                    mediaPlayer.stop();
+                }
+                mediaPlayer.release();
+            } catch (Exception ignored) {}
+            mediaPlayer = null;
+        }
         if (mediaSession != null) {
             try {
                 mediaSession.setActive(false);

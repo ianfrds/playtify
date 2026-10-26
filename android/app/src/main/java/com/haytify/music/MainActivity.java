@@ -1,13 +1,11 @@
 package com.haytify.music;
 
-import android.app.PictureInPictureParams;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
-import android.util.Rational;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -24,6 +22,28 @@ public class MainActivity extends BridgeActivity {
             instance.runOnUiThread(() -> {
                 instance.bridge.getWebView().evaluateJavascript(
                     "if (window.handleNotificationMediaAction) { window.handleNotificationMediaAction('" + action + "'); }",
+                    null
+                );
+            });
+        }
+    }
+
+    public static void dispatchPlaybackProgress(int currentSec, int totalSec) {
+        if (instance != null && instance.bridge != null && instance.bridge.getWebView() != null) {
+            instance.runOnUiThread(() -> {
+                instance.bridge.getWebView().evaluateJavascript(
+                    "if (window.handleNativeProgress) { window.handleNativeProgress(" + currentSec + ", " + totalSec + "); }",
+                    null
+                );
+            });
+        }
+    }
+
+    public static void dispatchPlaybackState(boolean isPlaying) {
+        if (instance != null && instance.bridge != null && instance.bridge.getWebView() != null) {
+            instance.runOnUiThread(() -> {
+                instance.bridge.getWebView().evaluateJavascript(
+                    "if (window.handleNativeStateChange) { window.handleNativeStateChange(" + isPlaying + "); }",
                     null
                 );
             });
@@ -57,7 +77,7 @@ public class MainActivity extends BridgeActivity {
             e.printStackTrace();
         }
 
-        // 4. Configure WebView settings for uninterrupted HTML5 streaming & PiP
+        // 4. Configure WebView settings for uninterrupted background streaming
         if (this.bridge != null && this.bridge.getWebView() != null) {
             WebView webView = this.bridge.getWebView();
             WebSettings settings = webView.getSettings();
@@ -74,8 +94,72 @@ public class MainActivity extends BridgeActivity {
             // Expose AndroidAudioBridge interface to Web UI
             Object audioBridge = new Object() {
                 @JavascriptInterface
+                public void playTrack(String videoId, String title, String artist, String coverUrl, String streamUrl) {
+                    MainActivity.this.isAudioPlaying = true;
+                    try {
+                        Intent serviceIntent = new Intent(MainActivity.this, HaytifyAudioService.class);
+                        serviceIntent.setAction(HaytifyAudioService.ACTION_PLAY_STREAM);
+                        serviceIntent.putExtra("videoId", videoId);
+                        serviceIntent.putExtra("title", title);
+                        serviceIntent.putExtra("artist", artist);
+                        serviceIntent.putExtra("coverUrl", coverUrl);
+                        serviceIntent.putExtra("streamUrl", streamUrl);
+                        ContextCompat.startForegroundService(MainActivity.this, serviceIntent);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                @JavascriptInterface
+                public void pauseAudio() {
+                    MainActivity.this.isAudioPlaying = false;
+                    try {
+                        Intent serviceIntent = new Intent(MainActivity.this, HaytifyAudioService.class);
+                        serviceIntent.setAction(HaytifyAudioService.ACTION_PAUSE);
+                        ContextCompat.startForegroundService(MainActivity.this, serviceIntent);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                @JavascriptInterface
+                public void resumeAudio() {
+                    MainActivity.this.isAudioPlaying = true;
+                    try {
+                        Intent serviceIntent = new Intent(MainActivity.this, HaytifyAudioService.class);
+                        serviceIntent.setAction(HaytifyAudioService.ACTION_RESUME);
+                        ContextCompat.startForegroundService(MainActivity.this, serviceIntent);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                @JavascriptInterface
+                public void togglePlay() {
+                    try {
+                        Intent serviceIntent = new Intent(MainActivity.this, HaytifyAudioService.class);
+                        serviceIntent.setAction(HaytifyAudioService.ACTION_TOGGLE);
+                        ContextCompat.startForegroundService(MainActivity.this, serviceIntent);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                @JavascriptInterface
+                public void seekTo(int seconds) {
+                    try {
+                        Intent serviceIntent = new Intent(MainActivity.this, HaytifyAudioService.class);
+                        serviceIntent.setAction(HaytifyAudioService.ACTION_SEEK);
+                        serviceIntent.putExtra("positionMsec", seconds * 1000);
+                        ContextCompat.startForegroundService(MainActivity.this, serviceIntent);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                @JavascriptInterface
                 public void updateTrack(String title, String artist, boolean isPlaying, String coverUrl) {
-                    isAudioPlaying = isPlaying;
+                    MainActivity.this.isAudioPlaying = isPlaying;
                     try {
                         Intent serviceIntent = new Intent(MainActivity.this, HaytifyAudioService.class);
                         serviceIntent.setAction(HaytifyAudioService.ACTION_UPDATE);
@@ -96,7 +180,7 @@ public class MainActivity extends BridgeActivity {
 
                 @JavascriptInterface
                 public void setAudioPlaying(boolean playing) {
-                    isAudioPlaying = playing;
+                    MainActivity.this.isAudioPlaying = playing;
                 }
 
                 @JavascriptInterface
@@ -107,6 +191,11 @@ public class MainActivity extends BridgeActivity {
                 @JavascriptInterface
                 public void minimizeToBackgroundAudio() {
                     runOnUiThread(() -> moveTaskToBack(true));
+                }
+
+                @JavascriptInterface
+                public boolean isNative() {
+                    return true;
                 }
             };
 
@@ -139,14 +228,12 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onPause() {
         super.onPause();
-        // Prevent Chromium WebView from pausing HTML5 audio tags when app is minimized
         keepWebViewMediaActive();
     }
 
     @Override
     public void onStop() {
         super.onStop();
-        // Prevent Chromium WebView from freezing audio when screen is locked or switching to another app
         keepWebViewMediaActive();
     }
 

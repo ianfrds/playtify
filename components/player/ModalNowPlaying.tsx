@@ -93,25 +93,6 @@ export default function ModalNowPlaying() {
           <button
             className="icon-circle-btn"
             onClick={() => {
-              if (typeof window !== 'undefined') {
-                const androidPip = (window as any).AndroidPiP;
-                if (androidPip && typeof androidPip.enterPip === 'function') {
-                  androidPip.enterPip();
-                }
-              }
-            }}
-            title="Layar Melayang (Picture-in-Picture)"
-            aria-label="Picture-in-Picture"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="2" y="4" width="20" height="16" rx="2" />
-              <rect x="11" y="11" width="9" height="7" rx="1" fill="currentColor" opacity="0.35" strokeWidth="1.5" />
-            </svg>
-          </button>
-
-          <button
-            className="icon-circle-btn"
-            onClick={() => {
               setNowPlayingModalOpen(false);
               router.push('/queue');
             }}
