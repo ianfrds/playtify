@@ -1,0 +1,17 @@
+import type { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  appId: 'com.haytify.music',
+  appName: 'Haytify',
+  webDir: 'public',
+  server: {
+    url: 'https://haytify.vercel.app',
+    cleartext: true,
+  },
+  android: {
+    allowMixedContent: true,
+    backgroundColor: '#121212',
+  },
+};
+
+export default config;

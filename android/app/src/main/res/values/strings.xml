@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Haytify</string>
+    <string name="title_activity_main">Haytify</string>
+    <string name="package_name">com.haytify.music</string>
+    <string name="custom_url_scheme">com.haytify.music</string>
+</resources>
