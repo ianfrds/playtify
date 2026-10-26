@@ -1,10 +1,14 @@
 package com.haytify.music;
 
+import android.app.PictureInPictureParams;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
+import android.util.Rational;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import androidx.core.content.ContextCompat;
@@ -39,7 +43,7 @@ public class MainActivity extends BridgeActivity {
             e.printStackTrace();
         }
 
-        // 4. Configure WebView settings for uninterrupted HTML5 streaming
+        // 4. Configure WebView settings for uninterrupted HTML5 streaming & PiP
         if (this.bridge != null && this.bridge.getWebView() != null) {
             WebView webView = this.bridge.getWebView();
             WebSettings settings = webView.getSettings();
@@ -52,7 +56,22 @@ public class MainActivity extends BridgeActivity {
             
             settings.setDomStorageEnabled(true);
             settings.setDatabaseEnabled(true);
+
+            // Expose AndroidPiP interface to Web UI
+            webView.addJavascriptInterface(new Object() {
+                @JavascriptInterface
+                public void enterPip() {
+                    runOnUiThread(() -> enterPictureInPicture());
+                }
+
+                @JavascriptInterface
+                public boolean isPipSupported() {
+                    return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;
+                }
+            }, "AndroidPiP");
         }
+
+        updatePipParams();
     }
 
     private void startBackgroundAudioService() {
@@ -85,6 +104,59 @@ public class MainActivity extends BridgeActivity {
             // Calling onResume() & resumeTimers() prevents the audio engine from being paused!
             webView.onResume();
             webView.resumeTimers();
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        updatePipParams();
+    }
+
+    @Override
+    public void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        // Automatically enter Picture-in-Picture when user minimizes the app or presses Home
+        enterPictureInPicture();
+    }
+
+    public void enterPictureInPicture() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
+                Rational aspectRatio = new Rational(16, 9);
+                builder.setAspectRatio(aspectRatio);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    builder.setAutoEnterEnabled(true);
+                    builder.setSeamlessResizeEnabled(true);
+                }
+                enterPictureInPictureMode(builder.build());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void updatePipParams() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
+                builder.setAspectRatio(new Rational(16, 9));
+                builder.setAutoEnterEnabled(true);
+                builder.setSeamlessResizeEnabled(true);
+                setPictureInPictureParams(builder.build());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        if (this.bridge != null && this.bridge.getWebView() != null) {
+            String script = "window.dispatchEvent(new CustomEvent('pipmodechange', { detail: { isInPip: " + isInPictureInPictureMode + " } }));";
+            this.bridge.getWebView().evaluateJavascript(script, null);
         }
     }
 

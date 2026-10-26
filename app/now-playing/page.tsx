@@ -37,6 +37,37 @@ export default function WebNowPlayingPage() {
 
   const [showMenu, setShowMenu] = useState(false);
   const [lyricsData, setLyricsData] = useState<any>(null);
+  const [isPipActive, setIsPipActive] = useState(false);
+
+  // Listen to Android / browser Picture-in-Picture state changes
+  useEffect(() => {
+    const handlePipChange = (e: any) => {
+      const inPip = !!e?.detail?.isInPip;
+      setIsPipActive(inPip);
+      if (typeof document !== 'undefined') {
+        document.body.classList.toggle('in-pip-mode', inPip);
+      }
+    };
+
+    window.addEventListener('pipmodechange', handlePipChange);
+    return () => {
+      window.removeEventListener('pipmodechange', handlePipChange);
+      if (typeof document !== 'undefined') {
+        document.body.classList.remove('in-pip-mode');
+      }
+    };
+  }, []);
+
+  const handleTriggerPiP = () => {
+    if (typeof window !== 'undefined') {
+      const androidPip = (window as any).AndroidPiP;
+      if (androidPip && typeof androidPip.enterPip === 'function') {
+        androidPip.enterPip();
+        return;
+      }
+      showToast('Picture-in-Picture aktif otomatis saat keluar ke beranda HP');
+    }
+  };
 
   // Fetch real-time synced lyrics for the preview card
   useEffect(() => {
@@ -199,12 +230,28 @@ export default function WebNowPlayingPage() {
                 <button onClick={handleArtistClick}>
                   <span>Buka Profil Artis</span>
                 </button>
+                <button onClick={handleTriggerPiP}>
+                  <span>Layar Melayang (PiP)</span>
+                </button>
                 <button onClick={() => router.push('/queue')}>
                   <span>Buka Antrean Lagu</span>
                 </button>
               </div>
             )}
           </div>
+
+          {/* Picture in Picture Button ⧉ */}
+          <button
+            className="now-playing-topbar-btn"
+            onClick={handleTriggerPiP}
+            title="Layar Melayang (Picture-in-Picture)"
+            aria-label="Layar Melayang (Picture-in-Picture)"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <rect x="11" y="11" width="9" height="7" rx="1" fill="currentColor" opacity="0.35" strokeWidth="1.5" />
+            </svg>
+          </button>
 
           {/* Fullscreen Expand ⤢ */}
           <button
