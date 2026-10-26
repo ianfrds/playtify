@@ -57,8 +57,22 @@ public class MainActivity extends BridgeActivity {
             settings.setDomStorageEnabled(true);
             settings.setDatabaseEnabled(true);
 
-            // Expose AndroidPiP interface to Web UI
-            webView.addJavascriptInterface(new Object() {
+            // Expose AndroidAudioBridge and AndroidPiP interface to Web UI
+            Object audioBridge = new Object() {
+                @JavascriptInterface
+                public void updateTrack(String title, String artist, boolean isPlaying) {
+                    try {
+                        Intent serviceIntent = new Intent(MainActivity.this, HaytifyAudioService.class);
+                        serviceIntent.setAction(HaytifyAudioService.ACTION_UPDATE);
+                        serviceIntent.putExtra("title", title);
+                        serviceIntent.putExtra("artist", artist);
+                        serviceIntent.putExtra("isPlaying", isPlaying);
+                        ContextCompat.startForegroundService(MainActivity.this, serviceIntent);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
                 @JavascriptInterface
                 public void enterPip() {
                     runOnUiThread(() -> enterPictureInPicture());
@@ -68,10 +82,16 @@ public class MainActivity extends BridgeActivity {
                 public boolean isPipSupported() {
                     return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;
                 }
-            }, "AndroidPiP");
-        }
 
-        updatePipParams();
+                @JavascriptInterface
+                public void moveToBack() {
+                    runOnUiThread(() -> moveTaskToBack(true));
+                }
+            };
+
+            webView.addJavascriptInterface(audioBridge, "AndroidAudioBridge");
+            webView.addJavascriptInterface(audioBridge, "AndroidPiP");
+        }
     }
 
     private void startBackgroundAudioService() {
@@ -80,6 +100,25 @@ public class MainActivity extends BridgeActivity {
             ContextCompat.startForegroundService(this, serviceIntent);
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (this.bridge != null && this.bridge.getWebView() != null) {
+            WebView webView = this.bridge.getWebView();
+            webView.evaluateJavascript(
+                "(function() { if (window.handleAndroidBack) { return window.handleAndroidBack(); } return 'unhandled'; })()",
+                result -> {
+                    if ("\"handled\"".equals(result) || "true".equals(result)) {
+                        return;
+                    }
+                    // At root page: move task to back without killing the activity or stopping music
+                    runOnUiThread(() -> moveTaskToBack(true));
+                }
+            );
+        } else {
+            moveTaskToBack(true);
         }
     }
 
@@ -107,44 +146,13 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        updatePipParams();
-    }
-
-    @Override
-    public void onUserLeaveHint() {
-        super.onUserLeaveHint();
-        // Automatically enter Picture-in-Picture when user minimizes the app or presses Home
-        enterPictureInPicture();
-    }
-
     public void enterPictureInPicture() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
                 PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
                 Rational aspectRatio = new Rational(16, 9);
                 builder.setAspectRatio(aspectRatio);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    builder.setAutoEnterEnabled(true);
-                    builder.setSeamlessResizeEnabled(true);
-                }
                 enterPictureInPictureMode(builder.build());
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    private void updatePipParams() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
-                builder.setAspectRatio(new Rational(16, 9));
-                builder.setAutoEnterEnabled(true);
-                builder.setSeamlessResizeEnabled(true);
-                setPictureInPictureParams(builder.build());
             } catch (Exception e) {
                 e.printStackTrace();
             }

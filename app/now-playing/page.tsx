@@ -253,18 +253,15 @@ export default function WebNowPlayingPage() {
             </svg>
           </button>
 
-          {/* Fullscreen Expand ⤢ */}
+          {/* Lyrics Button (Microphone Icon) */}
           <button
             className="now-playing-topbar-btn"
             onClick={() => openFullscreenLyrics()}
-            title="Layar Penuh Lirik"
-            aria-label="Layar Penuh Lirik"
+            title="Lirik Lagu (Sinkron)"
+            aria-label="Lirik Lagu"
           >
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <polyline points="15 3 21 3 21 9" />
-              <polyline points="9 21 3 21 3 15" />
-              <line x1="21" y1="3" x2="14" y2="10" />
-              <line x1="3" y1="21" x2="10" y2="14" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zm5.3 7.7a1 1 0 0 0-2 .2c0 2.9-2.4 5.3-5.3 5.3s-5.3-2.4-5.3-5.3a1 1 0 1 0-2-.2C3 13.5 5.9 17 9.8 17.2V20H7a1 1 0 0 0 0 2h10a1 1 0 0 0 0-2h-2.8v-2.8c3.9-.2 6.8-3.7 3.1-7.5z" />
             </svg>
           </button>
 

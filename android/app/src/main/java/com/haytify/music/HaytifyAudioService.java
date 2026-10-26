@@ -14,7 +14,11 @@ import androidx.core.app.NotificationCompat;
 
 public class HaytifyAudioService extends Service {
     public static final String CHANNEL_ID = "haytify_audio_playback";
-    public static final int NOTIFICATION_ID = 2026;
+    public static final String ACTION_UPDATE = "com.haytify.music.ACTION_UPDATE";
+
+    private String currentTitle = "Haytify Music";
+    private String currentArtist = "Musik berputar di latar belakang";
+    private boolean isPlaying = true;
 
     @Override
     public void onCreate() {
@@ -24,6 +28,27 @@ public class HaytifyAudioService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null) {
+            String action = intent.getAction();
+            if (ACTION_UPDATE.equals(action)) {
+                String title = intent.getStringExtra("title");
+                String artist = intent.getStringExtra("artist");
+                boolean playing = intent.getBooleanExtra("isPlaying", true);
+                if (title != null && !title.trim().isEmpty()) {
+                    currentTitle = title;
+                }
+                if (artist != null && !artist.trim().isEmpty()) {
+                    currentArtist = artist;
+                }
+                isPlaying = playing;
+            }
+        }
+
+        updateNotification();
+        return START_STICKY;
+    }
+
+    private void updateNotification() {
         Intent launchIntent = new Intent(this, MainActivity.class);
         launchIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
@@ -35,13 +60,14 @@ public class HaytifyAudioService extends Service {
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, launchIntent, pendingFlags);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Haytify Music")
-                .setContentText("Musik tetap aktif berputar di latar belakang")
+                .setContentTitle(currentTitle)
+                .setContentText(currentArtist)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setCategory(NotificationCompat.CATEGORY_SERVICE);
+                .setCategory(NotificationCompat.CATEGORY_SERVICE)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
 
         Notification notification = builder.build();
 
@@ -54,8 +80,6 @@ public class HaytifyAudioService extends Service {
         } catch (Throwable t) {
             t.printStackTrace();
         }
-
-        return START_STICKY;
     }
 
     @Nullable

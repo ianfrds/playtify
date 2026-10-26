@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAudio } from '@/context/AudioContext';
 import AuthGate from '@/components/auth/AuthGate';
 import AuthModal from '@/components/auth/AuthModal';
@@ -20,14 +21,138 @@ import FullscreenLyricsModal from '@/components/modals/FullscreenLyricsModal';
 import Toast from '@/components/common/Toast';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const audio = useAudio();
+
   const {
     user,
     isGuest,
     isAuthLoading,
+    currentTrack,
+    isPlaying,
     isQueueSidebarOpen,
     isLyricsSidebarOpen,
     isNowPlayingSidebarOpen,
-  } = useAudio();
+    isLyricsFullscreen,
+    closeFullscreenLyrics,
+    isNowPlayingModalOpen,
+    setNowPlayingModalOpen,
+    toggleQueueSidebar,
+    toggleLyricsSidebar,
+    toggleNowPlayingSidebar,
+    isRecDrawerOpen,
+    toggleRecDrawer,
+    editingPlaylist,
+    closeEditPlaylistModal,
+    deletingPlaylist,
+    closeDeletePlaylistModal,
+    isNewPlaylistModalOpen,
+    setIsNewPlaylistModalOpen,
+    isBrandModalOpen,
+    setIsBrandModalOpen,
+  } = audio;
+
+  // 1. Sync current song metadata to Android Native Media Notification
+  useEffect(() => {
+    if (typeof window !== 'undefined' && currentTrack) {
+      const bridge = (window as any).AndroidAudioBridge;
+      if (bridge && typeof bridge.updateTrack === 'function') {
+        bridge.updateTrack(currentTrack.title, currentTrack.artist, isPlaying);
+      }
+    }
+  }, [currentTrack, isPlaying]);
+
+  // 2. Sequential Android Hardware Back Button Navigation
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    (window as any).handleAndroidBack = () => {
+      // Step A: Close full screen lyrics if open
+      if (isLyricsFullscreen) {
+        closeFullscreenLyrics();
+        return 'handled';
+      }
+
+      // Step B: Close Now Playing modal if open
+      if (isNowPlayingModalOpen) {
+        setNowPlayingModalOpen(false);
+        return 'handled';
+      }
+
+      // Step C: Close flyout drawers if open
+      if (isQueueSidebarOpen) {
+        toggleQueueSidebar(false);
+        return 'handled';
+      }
+      if (isLyricsSidebarOpen) {
+        toggleLyricsSidebar(false);
+        return 'handled';
+      }
+      if (isNowPlayingSidebarOpen) {
+        toggleNowPlayingSidebar(false);
+        return 'handled';
+      }
+      if (isRecDrawerOpen) {
+        toggleRecDrawer(false);
+        return 'handled';
+      }
+
+      // Step D: Close popup modals if open
+      if (editingPlaylist) {
+        closeEditPlaylistModal();
+        return 'handled';
+      }
+      if (deletingPlaylist) {
+        closeDeletePlaylistModal();
+        return 'handled';
+      }
+      if (isNewPlaylistModalOpen) {
+        setIsNewPlaylistModalOpen(false);
+        return 'handled';
+      }
+      if (isBrandModalOpen) {
+        setIsBrandModalOpen(false);
+        return 'handled';
+      }
+
+      // Step E: Navigate backwards through routes in order
+      if (pathname && pathname !== '/') {
+        router.back();
+        return 'handled';
+      }
+
+      // Step F: At root page ('/'): signal unhandled so Android minimizes smoothly without killing app
+      return 'unhandled';
+    };
+
+    return () => {
+      delete (window as any).handleAndroidBack;
+    };
+  }, [
+    pathname,
+    router,
+    isLyricsFullscreen,
+    closeFullscreenLyrics,
+    isNowPlayingModalOpen,
+    setNowPlayingModalOpen,
+    isQueueSidebarOpen,
+    toggleQueueSidebar,
+    isLyricsSidebarOpen,
+    toggleLyricsSidebar,
+    isNowPlayingSidebarOpen,
+    toggleNowPlayingSidebar,
+    isRecDrawerOpen,
+    toggleRecDrawer,
+    editingPlaylist,
+    closeEditPlaylistModal,
+    deletingPlaylist,
+    closeDeletePlaylistModal,
+    isNewPlaylistModalOpen,
+    setIsNewPlaylistModalOpen,
+    isBrandModalOpen,
+    setIsBrandModalOpen,
+  ]);
 
   // 1. Loading splash screen while checking session & guest state
   if (isAuthLoading) {
