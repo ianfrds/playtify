@@ -18,33 +18,12 @@ import NewPlaylistModal from '@/components/modals/NewPlaylistModal';
 import EditPlaylistModal from '@/components/modals/EditPlaylistModal';
 import DeletePlaylistModal from '@/components/modals/DeletePlaylistModal';
 import FullscreenLyricsModal from '@/components/modals/FullscreenLyricsModal';
-import PictureInPictureOverlay from '@/components/player/PictureInPictureOverlay';
 import Toast from '@/components/common/Toast';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const audio = useAudio();
-  const [isPipActive, setIsPipActive] = React.useState(false);
-
-  // Android Picture-in-Picture mode listener
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handlePipChange = (e: any) => {
-      const inPip = !!e?.detail?.isInPip;
-      setIsPipActive(inPip);
-      if (typeof document !== 'undefined') {
-        document.body.classList.toggle('in-pip-mode', inPip);
-      }
-    };
-    window.addEventListener('pipmodechange', handlePipChange);
-    return () => {
-      window.removeEventListener('pipmodechange', handlePipChange);
-      if (typeof document !== 'undefined') {
-        document.body.classList.remove('in-pip-mode');
-      }
-    };
-  }, []);
 
   const {
     user,
@@ -319,9 +298,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <AuthModal />
         <Toast />
       </div>
-
-      {/* Picture-in-Picture dedicated view (showing only cover image & headphone background audio button) */}
-      <PictureInPictureOverlay track={currentTrack} isPlaying={isPlaying} />
     </>
   );
 }

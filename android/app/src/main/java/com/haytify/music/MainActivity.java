@@ -71,12 +71,11 @@ public class MainActivity extends BridgeActivity {
             settings.setDomStorageEnabled(true);
             settings.setDatabaseEnabled(true);
 
-            // Expose AndroidAudioBridge and AndroidPiP interface to Web UI
+            // Expose AndroidAudioBridge interface to Web UI
             Object audioBridge = new Object() {
                 @JavascriptInterface
                 public void updateTrack(String title, String artist, boolean isPlaying, String coverUrl) {
                     isAudioPlaying = isPlaying;
-                    updatePipParams(isPlaying);
                     try {
                         Intent serviceIntent = new Intent(MainActivity.this, HaytifyAudioService.class);
                         serviceIntent.setAction(HaytifyAudioService.ACTION_UPDATE);
@@ -98,17 +97,6 @@ public class MainActivity extends BridgeActivity {
                 @JavascriptInterface
                 public void setAudioPlaying(boolean playing) {
                     isAudioPlaying = playing;
-                    updatePipParams(playing);
-                }
-
-                @JavascriptInterface
-                public void enterPip() {
-                    runOnUiThread(() -> enterPictureInPicture());
-                }
-
-                @JavascriptInterface
-                public boolean isPipSupported() {
-                    return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O;
                 }
 
                 @JavascriptInterface
@@ -118,29 +106,11 @@ public class MainActivity extends BridgeActivity {
 
                 @JavascriptInterface
                 public void minimizeToBackgroundAudio() {
-                    runOnUiThread(() -> {
-                        try {
-                            moveTaskToBack(true);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    });
+                    runOnUiThread(() -> moveTaskToBack(true));
                 }
             };
 
             webView.addJavascriptInterface(audioBridge, "AndroidAudioBridge");
-            webView.addJavascriptInterface(audioBridge, "AndroidPiP");
-        }
-    }
-
-    private void updatePipParams(boolean isPlaying) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
-                builder.setAspectRatio(new Rational(1, 1));
-                builder.setAutoEnterEnabled(isPlaying);
-                setPictureInPictureParams(builder.build());
-            } catch (Exception ignored) {}
         }
     }
 
@@ -150,15 +120,6 @@ public class MainActivity extends BridgeActivity {
             ContextCompat.startForegroundService(this, serviceIntent);
         } catch (Exception e) {
             e.printStackTrace();
-        }
-    }
-
-    @Override
-    public void onUserLeaveHint() {
-        super.onUserLeaveHint();
-        // Auto-enter 1:1 PiP when exiting app while audio is playing
-        if (isAudioPlaying && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            enterPictureInPicture();
         }
     }
 
@@ -194,32 +155,6 @@ public class MainActivity extends BridgeActivity {
             WebView webView = this.bridge.getWebView();
             webView.onResume();
             webView.resumeTimers();
-        }
-    }
-
-    public void enterPictureInPicture() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try {
-                PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
-                // 1:1 Aspect ratio for square album cover!
-                Rational aspectRatio = new Rational(1, 1);
-                builder.setAspectRatio(aspectRatio);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    builder.setAutoEnterEnabled(true);
-                }
-                enterPictureInPictureMode(builder.build());
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    @Override
-    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
-        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
-        if (this.bridge != null && this.bridge.getWebView() != null) {
-            String script = "window.dispatchEvent(new CustomEvent('pipmodechange', { detail: { isInPip: " + isInPictureInPictureMode + " } }));";
-            this.bridge.getWebView().evaluateJavascript(script, null);
         }
     }
 
