@@ -49,16 +49,7 @@ export default function MobileMiniPlayer() {
 
       <div className="mini-player-info">
         <p className="mini-player-title">{currentTrack.title}</p>
-        <p
-          className="mini-player-artist clickable-artist"
-          onClick={(e) => {
-            e.stopPropagation();
-            const artistId = currentTrack.artistId || encodeURIComponent(currentTrack.artist.toLowerCase().trim().replace(/[^a-z0-9]/g, '-'));
-            router.push(`/artist/${artistId}`);
-          }}
-        >
-          {currentTrack.artist}
-        </p>
+        <p className="mini-player-artist">{currentTrack.artist}</p>
       </div>
 
       <div className="mini-player-controls" onClick={(e) => e.stopPropagation()}>

@@ -11,14 +11,37 @@ declare global {
 }
 
 export function GlobalAudioPlayer() {
-  const { onPlayerReady, onPlayerStateChange, onProgressUpdate } = useAudio();
+  const { onPlayerReady, onPlayerStateChange, onProgressUpdate, isPlaying } = useAudio();
   
   const audioEngineRef = useRef<HTMLAudioElement | null>(null);
   const ytPlayerRef = useRef<any>(null);
   const activeEngineRef = useRef<'native' | 'yt'>('native');
   const currentVideoIdRef = useRef<string | null>(null);
+  const isPlayingRef = useRef(isPlaying);
 
-  // Native background audio persistence is handled directly in MainActivity.java & HaytifyAudioService.java
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  // Keep background audio active when app goes to background / screen locks
+  useEffect(() => {
+    const keepPlaying = () => {
+      if (typeof document !== 'undefined' && document.hidden && isPlayingRef.current) {
+        if (activeEngineRef.current === 'native' && audioEngineRef.current?.paused) {
+          audioEngineRef.current.play().catch(() => {});
+        } else if (activeEngineRef.current === 'yt' && ytPlayerRef.current?.playVideo) {
+          ytPlayerRef.current.playVideo();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', keepPlaying);
+    window.addEventListener('blur', keepPlaying);
+    return () => {
+      document.removeEventListener('visibilitychange', keepPlaying);
+      window.removeEventListener('blur', keepPlaying);
+    };
+  }, []);
 
   // 1. Register Service Worker for PWA & Background Support
   useEffect(() => {
@@ -124,8 +147,8 @@ export function GlobalAudioPlayer() {
     const initYt = () => {
       if (window.YT && window.YT.Player) {
         ytPlayerRef.current = new window.YT.Player('yt-player-engine', {
-          height: '2',
-          width: '2',
+          height: '240',
+          width: '320',
           playerVars: {
             autoplay: 0,
             controls: 0,
@@ -141,6 +164,13 @@ export function GlobalAudioPlayer() {
             onStateChange: (event: any) => {
               // Only propagate YouTube events when YouTube is the active engine
               if (activeEngineRef.current === 'yt') {
+                if (event.data === 2) {
+                  // If YouTube was paused while user wanted playback and app is minimized/hidden, auto-resume!
+                  if (isPlayingRef.current && typeof document !== 'undefined' && document.hidden) {
+                    ytPlayerRef.current?.playVideo();
+                    return;
+                  }
+                }
                 onPlayerStateChange(event.data);
               }
             },
@@ -173,14 +203,13 @@ export function GlobalAudioPlayer() {
     <div
       style={{
         position: 'fixed',
-        bottom: 0,
-        right: 0,
-        width: 1,
-        height: 1,
-        opacity: 0.01,
+        left: -9999,
+        top: -9999,
+        width: 320,
+        height: 240,
+        opacity: 0.05,
         pointerEvents: 'none',
-        zIndex: -1,
-        overflow: 'hidden',
+        zIndex: -9999,
       }}
       aria-hidden="true"
     >

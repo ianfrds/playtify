@@ -72,7 +72,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setIsNewPlaylistModalOpen,
     isBrandModalOpen,
     setIsBrandModalOpen,
+    showToast,
   } = audio;
+
+  const navigationStackRef = React.useRef<string[]>(['/']);
+  const lastBackPressRef = React.useRef<number>(0);
+
+  // Track page navigation layers in an explicit history stack
+  useEffect(() => {
+    if (!pathname) return;
+    const stack = navigationStackRef.current;
+    const currentTop = stack[stack.length - 1];
+    if (currentTop !== pathname) {
+      const existingIdx = stack.lastIndexOf(pathname);
+      if (existingIdx !== -1 && existingIdx < stack.length - 1) {
+        // User navigated back: prune stack down to this level
+        navigationStackRef.current = stack.slice(0, existingIdx + 1);
+      } else {
+        // User pushed a new page: append layer
+        navigationStackRef.current.push(pathname);
+      }
+    }
+  }, [pathname]);
 
   // 1. Sync current song metadata and playback state to Android Native Media Notification & PiP auto-enter
   useEffect(() => {
@@ -89,24 +110,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [currentTrack, isPlaying]);
 
-  // 2. Sequential Android Hardware Back Button Navigation
+  // 2. Layer-by-Layer Android Hardware Back Button Navigation
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     (window as any).handleAndroidBack = () => {
-      // Step A: Close full screen lyrics if open
+      // Layer 1: Close full screen lyrics if open
       if (isLyricsFullscreen) {
         closeFullscreenLyrics();
         return 'handled';
       }
 
-      // Step B: Close Now Playing modal if open
+      // Layer 2: Close Now Playing modal if open
       if (isNowPlayingModalOpen) {
         setNowPlayingModalOpen(false);
         return 'handled';
       }
 
-      // Step C: Close flyout drawers if open
+      // Layer 3: Close flyout drawers if open
       if (isQueueSidebarOpen) {
         toggleQueueSidebar(false);
         return 'handled';
@@ -124,7 +145,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         return 'handled';
       }
 
-      // Step D: Close popup modals if open
+      // Layer 4: Close popup modals if open
       if (editingPlaylist) {
         closeEditPlaylistModal();
         return 'handled';
@@ -142,14 +163,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         return 'handled';
       }
 
-      // Step E: Navigate backwards through routes in order
-      if (pathname && pathname !== '/') {
-        router.back();
+      // Layer 5: Pop page navigation stack layer by layer
+      if (navigationStackRef.current.length > 1) {
+        navigationStackRef.current.pop(); // Pop current page
+        const prevPage = navigationStackRef.current[navigationStackRef.current.length - 1] || '/';
+        router.push(prevPage);
         return 'handled';
       }
 
-      // Step F: At root page ('/'): signal unhandled so Android minimizes smoothly without killing app
-      return 'unhandled';
+      // If on non-root page but stack is 1, return to home
+      if (pathname && pathname !== '/') {
+        navigationStackRef.current = ['/'];
+        router.push('/');
+        return 'handled';
+      }
+
+      // Layer 6: At Root ('/') -> Double back press within 2s to exit smoothly
+      const now = Date.now();
+      if (now - lastBackPressRef.current < 2000) {
+        const bridge = (window as any).AndroidAudioBridge;
+        if (bridge && typeof bridge.moveToBack === 'function') {
+          bridge.moveToBack();
+        }
+        return 'handled';
+      }
+
+      lastBackPressRef.current = now;
+      showToast('Tekan sekali lagi untuk keluar');
+      return 'handled';
     };
 
     return () => {
@@ -178,6 +219,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setIsNewPlaylistModalOpen,
     isBrandModalOpen,
     setIsBrandModalOpen,
+    showToast,
   ]);
 
   // 1. Loading splash screen while checking session & guest state

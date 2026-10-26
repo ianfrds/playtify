@@ -149,13 +149,7 @@ public class MainActivity extends BridgeActivity {
             WebView webView = this.bridge.getWebView();
             webView.evaluateJavascript(
                 "(function() { if (window.handleAndroidBack) { return window.handleAndroidBack(); } return 'unhandled'; })()",
-                result -> {
-                    if ("\"handled\"".equals(result) || "true".equals(result)) {
-                        return;
-                    }
-                    // At root page: move task to back without killing the activity or stopping music
-                    runOnUiThread(() -> moveTaskToBack(true));
-                }
+                null
             );
         } else {
             moveTaskToBack(true);

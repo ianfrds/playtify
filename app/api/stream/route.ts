@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Ytdl } from '@distube/ytdl-core';
+import { Ytdl, Client } from '@distube/ytdl-core';
 
 interface CachedFormat {
   url: string;
@@ -10,7 +10,10 @@ interface CachedFormat {
 
 const formatCache = new Map<string, CachedFormat>();
 const ytCookie = process.env.YT_COOKIE?.trim();
-const yt = new Ytdl(ytCookie ? { cookie: ytCookie } : undefined);
+const yt = new Ytdl({
+  clients: [Client.Tv, Client.WebEmbedded, Client.Mweb, Client.VisionOS],
+  cookie: ytCookie || undefined,
+});
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
