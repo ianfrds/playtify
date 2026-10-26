@@ -9,7 +9,8 @@ interface CachedFormat {
 }
 
 const formatCache = new Map<string, CachedFormat>();
-const yt = new Ytdl();
+const ytCookie = process.env.YT_COOKIE?.trim();
+const yt = new Ytdl(ytCookie ? { cookie: ytCookie } : undefined);
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -83,6 +84,12 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: any) {
     console.error('Stream route error for id', id, ':', err?.message || err);
-    return new NextResponse('Error streaming audio', { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Error streaming audio',
+        message: err?.message || String(err),
+      },
+      { status: 500 }
+    );
   }
 }
