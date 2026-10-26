@@ -14,6 +14,7 @@ import androidx.core.app.NotificationCompat;
 
 public class HaytifyAudioService extends Service {
     public static final String CHANNEL_ID = "haytify_audio_playback";
+    public static final int NOTIFICATION_ID = 2026;
     public static final String ACTION_UPDATE = "com.haytify.music.ACTION_UPDATE";
 
     private String currentTitle = "Haytify Music";
