@@ -18,12 +18,33 @@ import NewPlaylistModal from '@/components/modals/NewPlaylistModal';
 import EditPlaylistModal from '@/components/modals/EditPlaylistModal';
 import DeletePlaylistModal from '@/components/modals/DeletePlaylistModal';
 import FullscreenLyricsModal from '@/components/modals/FullscreenLyricsModal';
+import PictureInPictureOverlay from '@/components/player/PictureInPictureOverlay';
 import Toast from '@/components/common/Toast';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const audio = useAudio();
+  const [isPipActive, setIsPipActive] = React.useState(false);
+
+  // Android Picture-in-Picture mode listener
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handlePipChange = (e: any) => {
+      const inPip = !!e?.detail?.isInPip;
+      setIsPipActive(inPip);
+      if (typeof document !== 'undefined') {
+        document.body.classList.toggle('in-pip-mode', inPip);
+      }
+    };
+    window.addEventListener('pipmodechange', handlePipChange);
+    return () => {
+      window.removeEventListener('pipmodechange', handlePipChange);
+      if (typeof document !== 'undefined') {
+        document.body.classList.remove('in-pip-mode');
+      }
+    };
+  }, []);
 
   const {
     user,
@@ -53,12 +74,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setIsBrandModalOpen,
   } = audio;
 
-  // 1. Sync current song metadata to Android Native Media Notification
+  // 1. Sync current song metadata and playback state to Android Native Media Notification & PiP auto-enter
   useEffect(() => {
-    if (typeof window !== 'undefined' && currentTrack) {
+    if (typeof window !== 'undefined') {
       const bridge = (window as any).AndroidAudioBridge;
-      if (bridge && typeof bridge.updateTrack === 'function') {
-        bridge.updateTrack(currentTrack.title, currentTrack.artist, isPlaying);
+      if (bridge) {
+        if (currentTrack && typeof bridge.updateTrack === 'function') {
+          bridge.updateTrack(currentTrack.title, currentTrack.artist, isPlaying);
+        }
+        if (typeof bridge.setAudioPlaying === 'function') {
+          bridge.setAudioPlaying(isPlaying);
+        }
       }
     }
   }, [currentTrack, isPlaying]);
@@ -231,6 +257,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <AuthModal />
         <Toast />
       </div>
+
+      {/* Picture-in-Picture dedicated view (showing only cover image & headphone background audio button) */}
+      <PictureInPictureOverlay track={currentTrack} isPlaying={isPlaying} />
     </>
   );
 }

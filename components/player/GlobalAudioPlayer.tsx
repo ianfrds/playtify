@@ -201,6 +201,11 @@ export function GlobalAudioPlayer() {
         }}
         onPause={() => {
           if (activeEngineRef.current === 'native') {
+            if (typeof document !== 'undefined' && document.hidden) {
+              // Chromium throttled/paused HTML5 audio in background -> auto resume
+              audioEngineRef.current?.play().catch(() => {});
+              return;
+            }
             onPlayerStateChange(2); // Paused
           }
         }}

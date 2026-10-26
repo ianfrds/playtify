@@ -16,6 +16,7 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private PowerManager.WakeLock wakeLock;
+    private boolean isAudioPlaying = false;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -61,6 +62,8 @@ public class MainActivity extends BridgeActivity {
             Object audioBridge = new Object() {
                 @JavascriptInterface
                 public void updateTrack(String title, String artist, boolean isPlaying) {
+                    isAudioPlaying = isPlaying;
+                    updatePipParams(isPlaying);
                     try {
                         Intent serviceIntent = new Intent(MainActivity.this, HaytifyAudioService.class);
                         serviceIntent.setAction(HaytifyAudioService.ACTION_UPDATE);
@@ -71,6 +74,12 @@ public class MainActivity extends BridgeActivity {
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
+                }
+
+                @JavascriptInterface
+                public void setAudioPlaying(boolean playing) {
+                    isAudioPlaying = playing;
+                    updatePipParams(playing);
                 }
 
                 @JavascriptInterface
@@ -87,10 +96,32 @@ public class MainActivity extends BridgeActivity {
                 public void moveToBack() {
                     runOnUiThread(() -> moveTaskToBack(true));
                 }
+
+                @JavascriptInterface
+                public void minimizeToBackgroundAudio() {
+                    runOnUiThread(() -> {
+                        try {
+                            moveTaskToBack(true);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    });
+                }
             };
 
             webView.addJavascriptInterface(audioBridge, "AndroidAudioBridge");
             webView.addJavascriptInterface(audioBridge, "AndroidPiP");
+        }
+    }
+
+    private void updatePipParams(boolean isPlaying) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            try {
+                PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
+                builder.setAspectRatio(new Rational(1, 1));
+                builder.setAutoEnterEnabled(isPlaying);
+                setPictureInPictureParams(builder.build());
+            } catch (Exception ignored) {}
         }
     }
 
@@ -100,6 +131,15 @@ public class MainActivity extends BridgeActivity {
             ContextCompat.startForegroundService(this, serviceIntent);
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        // Auto-enter 1:1 PiP when exiting app while audio is playing
+        if (isAudioPlaying && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            enterPictureInPicture();
         }
     }
 
@@ -125,22 +165,20 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onPause() {
         super.onPause();
-        // CRITICAL: Prevent Chromium WebView from pausing HTML5 audio tags when app is minimized
+        // Prevent Chromium WebView from pausing HTML5 audio tags when app is minimized
         keepWebViewMediaActive();
     }
 
     @Override
     public void onStop() {
         super.onStop();
-        // CRITICAL: Prevent Chromium WebView from freezing audio when screen is locked or switching to another app
+        // Prevent Chromium WebView from freezing audio when screen is locked or switching to another app
         keepWebViewMediaActive();
     }
 
     private void keepWebViewMediaActive() {
         if (this.bridge != null && this.bridge.getWebView() != null) {
             WebView webView = this.bridge.getWebView();
-            // In Android WebView, onPause() pauses all HTML5 audio elements.
-            // Calling onResume() & resumeTimers() prevents the audio engine from being paused!
             webView.onResume();
             webView.resumeTimers();
         }
@@ -150,8 +188,12 @@ public class MainActivity extends BridgeActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
                 PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder();
-                Rational aspectRatio = new Rational(16, 9);
+                // 1:1 Aspect ratio for square album cover!
+                Rational aspectRatio = new Rational(1, 1);
                 builder.setAspectRatio(aspectRatio);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    builder.setAutoEnterEnabled(true);
+                }
                 enterPictureInPictureMode(builder.build());
             } catch (Exception e) {
                 e.printStackTrace();
