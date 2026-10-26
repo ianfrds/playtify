@@ -21,20 +21,20 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: 3. Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: 4. Set up Node.js
+      - name: 3. Set up Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
 
-      - name: 5. Install Project Dependencies
+      - name: 4. Install Dependencies
         run: npm ci
 
-      - name: 6. Sync Capacitor Android
+      - name: 5. Sync Capacitor Android
         run: npx cap sync android
+
+      - name: 6. Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: 7. Build Debug APK with Gradle
         working-directory: android
