@@ -6,6 +6,7 @@ import { useAudio } from '@/context/AudioContext';
 import { CURATED_PLAYLISTS } from '@/data/recommendations';
 import TrackRow from '@/components/tracks/TrackRow';
 import { Track } from '@/types';
+import { sanitizeTracks } from '@/lib/trackSanitizer';
 
 export default function PlaylistDetailPage() {
   const params = useParams();
@@ -41,7 +42,7 @@ export default function PlaylistDetailPage() {
     cover = curated.cover || curated.thumb;
     gradient = curated.gradient || 'linear-gradient(135deg, #006450, #1ed760)';
 
-    tracks = curated.tracks && curated.tracks.length > 0 ? curated.tracks : [];
+    tracks = curated.tracks && curated.tracks.length > 0 ? sanitizeTracks(curated.tracks) : [];
   } else if (userPlaylist) {
     title = userPlaylist.name;
     description = userPlaylist.description || userPlaylist.desc || 'Dibuat oleh Kamu';
@@ -51,7 +52,7 @@ export default function PlaylistDetailPage() {
       userPlaylist.tracks[0]?.thumbnail ||
       userPlaylist.tracks[0]?.thumb ||
       'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=600&auto=format&fit=crop&q=80';
-    tracks = userPlaylist.tracks;
+    tracks = sanitizeTracks(userPlaylist.tracks || []);
   } else {
     title = 'Daftar Putar';
     description = 'Koleksi musik pilihan';

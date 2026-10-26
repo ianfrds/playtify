@@ -20,6 +20,30 @@ export const BROKEN_ID_MAP: Record<string, { id: string; thumb: string }> = {
 
 export const DEFAULT_FALLBACK_COVER = '/logo.png';
 
+export function isGarbageTrack(track: any): boolean {
+  if (!track || !track.title) return true;
+  // Negative duration indicates a YouTube live stream
+  if (typeof track.duration === 'number' && track.duration < 0) return true;
+
+  const title = (track.title || '').toLowerCase();
+  const artist = (track.artist || '').toLowerCase();
+
+  // Known junk livestream/gaming prefixes and titles from YouTube trending
+  if (title.startsWith('🔥 welcome to my') || title.startsWith('🎮 welcome to my')) return true;
+  if (title.includes('🔴 live') || title.includes('gta 5 live') || title.includes('live gameplay')) return true;
+  if (title.includes('live streaming') || title.includes('kajian ibnusina') || title.includes('om andre sedang live')) return true;
+  if (title.includes('live noodles') || title.includes('satisfying huarong') || title.includes('montir ada')) return true;
+
+  // Generic check for live streams or excessively long gaming broadcasts (>2 hours)
+  if (typeof track.duration === 'number' && track.duration > 7200) {
+    if (title.includes('live') || title.includes('stream') || title.includes('gameplay') || title.includes('eps') || title.includes('part')) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function sanitizeTrack(track: Track): Track {
   if (!track) return track;
   let newId = track.id;
@@ -46,9 +70,12 @@ export function sanitizeTrack(track: Track): Track {
     newThumb = 'https://i.ytimg.com/vi/HB8vftGxsIc/hqdefault.jpg';
   }
 
+  const cleanDuration = (typeof track.duration === 'number' && track.duration > 0) ? track.duration : 210;
+
   return {
     ...track,
     id: newId,
+    duration: cleanDuration,
     thumb: newThumb || DEFAULT_FALLBACK_COVER,
     thumbnail: newThumb || DEFAULT_FALLBACK_COVER,
   };
@@ -56,5 +83,8 @@ export function sanitizeTrack(track: Track): Track {
 
 export function sanitizeTracks(tracks: Track[]): Track[] {
   if (!Array.isArray(tracks)) return [];
-  return tracks.map(sanitizeTrack);
+  return tracks
+    .filter((t) => !isGarbageTrack(t))
+    .map(sanitizeTrack);
 }
+

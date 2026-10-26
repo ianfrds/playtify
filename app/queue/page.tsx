@@ -16,8 +16,10 @@ export default function QueuePage() {
   } = useAudio();
 
   const formatTime = (secs: number) => {
-    const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
+    if (!secs || isNaN(secs) || secs <= 0) return '3:20';
+    const safeSecs = Math.max(0, Math.floor(secs));
+    const m = Math.floor(safeSecs / 60);
+    const s = Math.floor(safeSecs % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 

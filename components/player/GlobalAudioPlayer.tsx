@@ -18,37 +18,7 @@ export function GlobalAudioPlayer() {
   const activeEngineRef = useRef<'native' | 'yt'>('native');
   const currentVideoIdRef = useRef<string | null>(null);
 
-  // Helper to start Android native Foreground Service when playing inside native APK
-  const startNativeForeground = async () => {
-    if (typeof window === 'undefined') return;
-    const Cap = (window as any).Capacitor;
-    if (Cap && typeof Cap.isNativePlatform === 'function' && Cap.isNativePlatform()) {
-      try {
-        const { ForegroundService } = await import('@capawesome-team/capacitor-android-foreground-service');
-        await ForegroundService.startForegroundService({
-          id: 9999,
-          title: 'Haytify',
-          body: 'Sedang memutar musik di latar belakang...',
-          smallIcon: 'ic_launcher',
-        });
-      } catch (e) {
-        console.warn('Native foreground service error:', e);
-      }
-    }
-  };
-
-  const stopNativeForeground = async () => {
-    if (typeof window === 'undefined') return;
-    const Cap = (window as any).Capacitor;
-    if (Cap && typeof Cap.isNativePlatform === 'function' && Cap.isNativePlatform()) {
-      try {
-        const { ForegroundService } = await import('@capawesome-team/capacitor-android-foreground-service');
-        await ForegroundService.stopForegroundService();
-      } catch (e) {
-        console.warn('Native foreground service stop error:', e);
-      }
-    }
-  };
+  // Native background audio persistence is handled directly in MainActivity.java & HaytifyAudioService.java
 
   // 1. Register Service Worker for PWA & Background Support
   useEffect(() => {
@@ -171,11 +141,6 @@ export function GlobalAudioPlayer() {
             onStateChange: (event: any) => {
               // Only propagate YouTube events when YouTube is the active engine
               if (activeEngineRef.current === 'yt') {
-                if (event.data === 1) {
-                  startNativeForeground();
-                } else if (event.data === 2 || event.data === 0) {
-                  stopNativeForeground();
-                }
                 onPlayerStateChange(event.data);
               }
             },
@@ -230,19 +195,16 @@ export function GlobalAudioPlayer() {
         preload="auto"
         playsInline
         onPlay={() => {
-          startNativeForeground();
           if (activeEngineRef.current === 'native') {
             onPlayerStateChange(1); // Playing
           }
         }}
         onPause={() => {
-          stopNativeForeground();
           if (activeEngineRef.current === 'native') {
             onPlayerStateChange(2); // Paused
           }
         }}
         onEnded={() => {
-          stopNativeForeground();
           if (activeEngineRef.current === 'native') {
             onPlayerStateChange(0); // Ended -> auto plays next track in queue!
           }

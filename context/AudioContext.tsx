@@ -315,7 +315,24 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         try {
           const parsed = JSON.parse(savedCurated);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            setCuratedPlaylists(parsed);
+            const cleaned = parsed.map((pl: any) => ({
+              ...pl,
+              tracks: sanitizeTracks(pl.tracks || []),
+            }));
+
+            // If top-indo or any playlist was corrupted by livestream junk, reset to pristine CURATED_PLAYLISTS
+            const isCorrupted = cleaned.some((pl: any) => 
+              !pl.tracks || pl.tracks.length === 0 || 
+              (pl.id === 'top-indo' && pl.tracks.length < 5)
+            );
+
+            if (isCorrupted) {
+              localStorage.removeItem('playtify_curated_playlists');
+              setCuratedPlaylists(CURATED_PLAYLISTS.map((p) => ({ ...p, tracks: sanitizeTracks(p.tracks) })));
+            } else {
+              setCuratedPlaylists(cleaned);
+              localStorage.setItem('playtify_curated_playlists', JSON.stringify(cleaned));
+            }
           }
         } catch {
           // ignore

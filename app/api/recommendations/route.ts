@@ -50,20 +50,17 @@ export async function GET(request: Request) {
     }
   }
 
-  // Clone curated playlists and inject live trending if available
-  const playlists = JSON.parse(JSON.stringify(CURATED_PLAYLISTS));
-  if (liveTrending.length > 0) {
-    playlists[0].tracks = [...liveTrending, ...playlists[0].tracks.slice(liveTrending.length)];
-  }
+  // Return pristine curated playlists without polluting them with non-music YouTube trending
+  const playlists = CURATED_PLAYLISTS.map((pl) => ({
+    ...pl,
+    tracks: sanitizeTracks(pl.tracks || []),
+  }));
 
   return NextResponse.json({
     updatedAt: new Date().toISOString(),
-    isLive: liveTrending.length > 0,
-    results: liveTrending.length > 0 ? liveTrending : undefined,
+    isLive: false,
+    results: sanitizeTracks(CURATED_PLAYLISTS[0]?.tracks || []),
     playlists,
-    shelves: {
-      ...RECOMMENDATIONS_DATA,
-      ...(liveTrending.length > 0 ? { top_indo: liveTrending } : {})
-    }
+    shelves: RECOMMENDATIONS_DATA,
   });
 }
