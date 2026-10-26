@@ -15,12 +15,25 @@ import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    public static MainActivity instance;
     private PowerManager.WakeLock wakeLock;
     private boolean isAudioPlaying = false;
+
+    public static void dispatchMediaAction(String action) {
+        if (instance != null && instance.bridge != null && instance.bridge.getWebView() != null) {
+            instance.runOnUiThread(() -> {
+                instance.bridge.getWebView().evaluateJavascript(
+                    "if (window.handleNotificationMediaAction) { window.handleNotificationMediaAction('" + action + "'); }",
+                    null
+                );
+            });
+        }
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        instance = this;
 
         // 1. Request notification permission on Android 13+ (API 33+) so foreground service notification can display
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -61,7 +74,7 @@ public class MainActivity extends BridgeActivity {
             // Expose AndroidAudioBridge and AndroidPiP interface to Web UI
             Object audioBridge = new Object() {
                 @JavascriptInterface
-                public void updateTrack(String title, String artist, boolean isPlaying) {
+                public void updateTrack(String title, String artist, boolean isPlaying, String coverUrl) {
                     isAudioPlaying = isPlaying;
                     updatePipParams(isPlaying);
                     try {
@@ -70,10 +83,16 @@ public class MainActivity extends BridgeActivity {
                         serviceIntent.putExtra("title", title);
                         serviceIntent.putExtra("artist", artist);
                         serviceIntent.putExtra("isPlaying", isPlaying);
+                        serviceIntent.putExtra("coverUrl", coverUrl);
                         ContextCompat.startForegroundService(MainActivity.this, serviceIntent);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
+                }
+
+                @JavascriptInterface
+                public void updateTrack(String title, String artist, boolean isPlaying) {
+                    updateTrack(title, artist, isPlaying, null);
                 }
 
                 @JavascriptInterface
@@ -206,6 +225,9 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onDestroy() {
+        if (instance == this) {
+            instance = null;
+        }
         if (wakeLock != null && wakeLock.isHeld()) {
             try {
                 wakeLock.release();

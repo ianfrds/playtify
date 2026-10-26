@@ -95,13 +95,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [pathname]);
 
-  // 1. Sync current song metadata and playback state to Android Native Media Notification & PiP auto-enter
+  // 1. Sync current song metadata, cover art, and playback state to Android Native Media Notification & PiP auto-enter
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const bridge = (window as any).AndroidAudioBridge;
       if (bridge) {
         if (currentTrack && typeof bridge.updateTrack === 'function') {
-          bridge.updateTrack(currentTrack.title, currentTrack.artist, isPlaying);
+          const cover = currentTrack.thumbnail || currentTrack.thumb || '';
+          bridge.updateTrack(currentTrack.title, currentTrack.artist, isPlaying, cover);
         }
         if (typeof bridge.setAudioPlaying === 'function') {
           bridge.setAudioPlaying(isPlaying);
@@ -109,6 +110,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       }
     }
   }, [currentTrack, isPlaying]);
+
+  // 2. Handle Android Notification Media Controller Actions (Previous, Play/Pause, Next)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    (window as any).handleNotificationMediaAction = (action: string) => {
+      if (action === 'prev') {
+        audio.playPrev();
+      } else if (action === 'toggle') {
+        audio.togglePlay();
+      } else if (action === 'next') {
+        audio.playNext();
+      }
+    };
+
+    return () => {
+      delete (window as any).handleNotificationMediaAction;
+    };
+  }, [audio.playPrev, audio.togglePlay, audio.playNext]);
 
   // 2. Layer-by-Layer Android Hardware Back Button Navigation
   useEffect(() => {
